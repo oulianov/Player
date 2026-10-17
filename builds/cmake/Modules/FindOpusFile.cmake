@@ -34,6 +34,13 @@ find_path(OPUSFILE_INCLUDE_DIR
 	PATH_SUFFIXES opus
 	HINTS ${PC_OPUSFILE_INCLUDE_DIRS})
 
+# opusfile.h includes opus_multistream.h of opus, which can be in another
+# folder (Homebrew: each package in its own)
+find_path(OPUS_INCLUDE_DIR
+	NAMES opus_multistream.h
+	PATH_SUFFIXES opus
+	HINTS ${PC_OPUSFILE_INCLUDE_DIRS})
+
 # Look for the library.
 # Allow OPUSFILE_LIBRARY to be set manually, as the location of the Opusfile library
 if(NOT OPUSFILE_LIBRARY)
@@ -55,6 +62,10 @@ find_package_handle_standard_args(OpusFile
 
 if(OPUSFILE_FOUND)
 	set(OPUSFILE_INCLUDE_DIRS ${OPUSFILE_INCLUDE_DIR})
+	if(OPUS_INCLUDE_DIR)
+		list(APPEND OPUSFILE_INCLUDE_DIRS ${OPUS_INCLUDE_DIR})
+		list(REMOVE_DUPLICATES OPUSFILE_INCLUDE_DIRS)
+	endif()
 
 	if(NOT OPUSFILE_LIBRARIES)
 		set(OPUSFILE_LIBRARIES ${OPUSFILE_LIBRARIES})
@@ -69,4 +80,4 @@ if(OPUSFILE_FOUND)
 	endif()
 endif()
 
-mark_as_advanced(OPUSFILE_INCLUDE_DIR OPUSFILE_LIBRARY OPUS_LIBRARY)
+mark_as_advanced(OPUSFILE_INCLUDE_DIR OPUS_INCLUDE_DIR OPUSFILE_LIBRARY OPUS_LIBRARY)

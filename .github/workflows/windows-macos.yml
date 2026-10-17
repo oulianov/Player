@@ -1,0 +1,130 @@
+name: Windows and macOS
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      git-ref:
+        description: Git Ref (Optional)
+        required: false
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  # Visual Studio 2022 and the libraries EasyRPG builds for it (buildscripts'
+  # download_prebuilt.cmd): Player.exe, linked statically
+  windows:
+    name: Windows (x64)
+    runs-on: windows-2022
+
+    steps:
+      - name: Clone Repository
+        uses: actions/checkout@v7
+        if: github.event.inputs.git-ref == ''
+      - name: Clone Repository (with custom ref)
+        uses: actions/checkout@v7
+        if: github.event.inputs.git-ref != ''
+        with:
+          ref: ${{ github.event.inputs.git-ref }}
+
+      # the vcpkg folder of the buildscripts, where the presets look for it
+      - name: Download the libraries
+        shell: pwsh
+        run: |
+          $vcpkg = "$env:RUNNER_TEMP\buildscripts\windows\vcpkg"
+          New-Item -ItemType Directory -Force $vcpkg | Out-Null
+          curl.exe -fsSL -o "$env:RUNNER_TEMP\toolchain-windows.zip" https://ci.easyrpg.org/downloads/windows/toolchain-windows.zip
+          # Windows' tar (bsdtar) reads zip files, Git's does not
+          & "$env:SystemRoot\System32\tar.exe" -xf "$env:RUNNER_TEMP\toolchain-windows.zip" -C $vcpkg --strip-components=1
+          "EASYRPG_BUILDSCRIPTS=$env:RUNNER_TEMP\buildscripts" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Configure
+        run: |
+          cmake --preset windows-x64-vs2022-release \
+            -DPLAYER_BUILD_LIBLCF=ON -DPLAYER_VERSION_APPEND="(GA-x64, $(date +%Y-%m-%d))"
+
+      - name: Compile
+        run: |
+          cmake --build build/windows-x64-vs2022-release --config Release --parallel
+
+      - name: Test
+        run: |
+          cmake --build build/windows-x64-vs2022-release --config Release --target check
+
+      - name: Upload
+        uses: actions/upload-artifact@v7
+        with:
+          name: easyrpg-player-windows-x64
+          path: build/windows-x64-vs2022-release/Release/Player.exe
+
+  # Homebrew's libraries, copied into the app (dylibbundler): the app runs on
+  # this runner's macOS and newer, on Apple silicon. Not signed: the first
+  # time, open it with a right click > Open.
+  macos:
+    name: macOS (arm64)
+    runs-on: macos-15
+    env:
+      HOMEBREW_NO_INSTALL_CLEANUP: 1
+      HOMEBREW_NO_AUTO_UPDATE: 1
+
+    steps:
+      # FluidSynth and WildMidi left out (they need sound fonts or a
+      # configuration): MIDI music plays through the built-in synthesizer
+      - name: Install dependencies
+        run: |
+          brew install --quiet ninja pkgconf dylibbundler sdl3 icu4c expat inih nlohmann-json \
+            libpng fmt pixman freetype harfbuzz lhasa speexdsp mpg123 libsndfile libvorbis opusfile libxmp
+          # ICU and expat are keg-only: CMake is told where they are
+          icu=$(ls -d "$(brew --prefix)"/opt/icu4c* | sort -V | tail -1)
+          echo "PREFIX_PATH=$icu;$(brew --prefix expat)" >> "$GITHUB_ENV"
+
+      - name: Clone Repository
+        uses: actions/checkout@v7
+        if: github.event.inputs.git-ref == ''
+      - name: Clone Repository (with custom ref)
+        uses: actions/checkout@v7
+        if: github.event.inputs.git-ref != ''
+        with:
+          ref: ${{ github.event.inputs.git-ref }}
+
+      - name: Use gcc problem matcher
+        run: echo "::add-matcher::.github/gcc_comment_matcher.json"
+
+      - name: Compile
+        run: |
+          cmake -G Ninja -B build . \
+            -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$PREFIX_PATH" \
+            -DPLAYER_TARGET_PLATFORM=SDL3 -DPLAYER_WITH_FLUIDSYNTH=OFF -DPLAYER_WITH_WILDMIDI=OFF \
+            -DPLAYER_BUILD_LIBLCF=ON -DPLAYER_VERSION_APPEND="(GA-arm64, $(date +%Y-%m-%d))"
+          cmake --build build
+
+      - name: Test
+        run: |
+          cmake --build build --target check
+
+      # the libraries in Contents/libs, then the app signed again (ad hoc):
+      # changing a binary removes its signature, which arm64 needs
+      - name: Package
+        run: |
+          app="build/EasyRPG Player.app"
+          dylibbundler -od -b -cd -x "$app/Contents/MacOS/EasyRPG Player" -d "$app/Contents/libs/" -p @executable_path/../libs/
+          codesign --force --deep --sign - "$app"
+          if otool -L "$app/Contents/MacOS/EasyRPG Player" "$app"/Contents/libs/*.dylib | grep -q "$(brew --prefix)"; then
+            echo "::error::The app still uses libraries of Homebrew"
+            exit 1
+          fi
+          "$app/Contents/MacOS/EasyRPG Player" --version
+          ditto -c -k --keepParent "$app" easyrpg-player-macos-arm64.zip
+
+      - name: Upload
+        uses: actions/upload-artifact@v7
+        with:
+          name: easyrpg-player-macos-arm64
+          path: easyrpg-player-macos-arm64.zip
