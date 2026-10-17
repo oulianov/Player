@@ -100,7 +100,7 @@ void Scene_Menu::CreateCommandWindow() {
 					}
 					break;
 				case Wait:
-					if (Feature::HasRpg2k3BattleSystem()) {
+					if (Feature::HasRpg2k3BattleSystem() && !Feature::HasRpg2k3TurnBasedBattle()) {
 						command_options.push_back((CommandOptionType)*it);
 					}
 					break;

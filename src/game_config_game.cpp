@@ -70,6 +70,10 @@ void Game_ConfigGame::LoadFromArgs(CmdlineParser& cp) {
 			new_game.Set(arg.ArgIsOn());
 			continue;
 		}
+		if (cp.ParseNext(arg, 0, {"--turn-based-battle", "--no-turn-based-battle"})) {
+			turn_based_battle.Set(arg.ArgIsOn());
+			continue;
+		}
 		if (cp.ParseNext(arg, 1, "--engine")) {
 			if (arg.NumValues() > 0) {
 				const auto& v = arg.Value(0);
@@ -215,6 +219,7 @@ void Game_ConfigGame::LoadFromStream(Filesystem_Stream::InputStream& is) {
 	engine_str.FromIni(ini);
 	engine_path.FromIni(ini);
 	fake_resolution.FromIni(ini);
+	turn_based_battle.FromIni(ini);
 
 	if (patch_easyrpg.FromIni(ini)) {
 		patch_override = true;

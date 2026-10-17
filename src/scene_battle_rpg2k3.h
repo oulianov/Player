@@ -260,6 +260,23 @@ protected:
 	int GetNextReadyActor();
 
 	std::vector<int> atb_order;
+
+	// Turn based battle (TurnBasedBattle option): every actor that can act
+	// chooses a command (their gauge is full until they do), then all actions
+	// run in agility order and the next round starts.
+	bool IsTurnBased() const;
+	void StartTurnCommandPhase();
+	void QueueTurnAction(Game_Battler* battler);
+	bool ReturnToPreviousActor();
+	void StartTurnExecution();
+	void EndTurn();
+	void ApplyStateConditions(Game_Battler& battler);
+
+	bool turn_based = false;
+	/** True from the first to the last action of a round */
+	bool turn_executing = false;
+	/** Actors whose command was chosen by the player this round, for undo */
+	std::vector<Game_Actor*> turn_commanded_actors;
 };
 
 #endif

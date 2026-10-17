@@ -38,6 +38,10 @@ bool Feature::HasRpg2k3BattleSystem() {
 	return !HasRpg2kBattleSystem();
 }
 
+bool Feature::HasRpg2k3TurnBasedBattle() {
+	return HasRpg2k3BattleSystem() && Player::game_config.turn_based_battle.Get();
+}
+
 bool Feature::HasRow() {
 	if (HasRpg2k3BattleSystem() && !lcf::Data::battlecommands.easyrpg_disable_row_feature) {
 		return true;

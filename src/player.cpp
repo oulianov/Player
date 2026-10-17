@@ -1544,6 +1544,9 @@ Engine options:
                       store them in PATH. When using the game browser all games
                       will share the same save directory!
  --seed N             Seeds the random number generator with N.
+ --turn-based-battle  RPG Maker 2003 battles are turn-based: all commands are
+                      chosen first, then everyone acts in agility order.
+                      Enabled by default. Use --no-turn-based-battle for ATB.
 
 Providing any patch option disables the patch autodetection of the engine.
 

@@ -33,6 +33,12 @@ namespace Feature {
 	bool HasRpg2k3BattleSystem();
 
 	/**
+	 * @return true if the RPG Maker 2003 battle system is turn based instead of ATB
+	 * (TurnBasedBattle option): no time gauge and no Active/Wait mode
+	 */
+	bool HasRpg2k3TurnBasedBattle();
+
+	/**
 	 * @return true if the row feature is enabled
 	 */
 	bool HasRow();

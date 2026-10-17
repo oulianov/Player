@@ -57,6 +57,7 @@ Scene_Battle_Rpg2k3::Scene_Battle_Rpg2k3(const BattleArgs& args) :
 	Scene_Battle(args),
 	first_strike(args.first_strike)
 {
+	turn_based = Feature::HasRpg2k3TurnBasedBattle();
 }
 
 void Scene_Battle_Rpg2k3::Start() {
@@ -193,6 +194,10 @@ void Scene_Battle_Rpg2k3::InitAtbGauge(Game_Battler& battler, int preempt_atb, i
 }
 
 void Scene_Battle_Rpg2k3::InitAtbGauges() {
+	if (IsTurnBased()) {
+		StartTurnCommandPhase();
+		return;
+	}
 	for (auto& enemy: Main_Data::game_enemyparty->GetEnemies()) {
 		InitAtbGauge(*enemy, 0, Game_Battler::GetMaxAtbGauge());
 	}
@@ -298,6 +303,11 @@ void Scene_Battle_Rpg2k3::CreateUi() {
 	CreateBattleCommandWindow();
 
 	RecreateSpWindow(nullptr);
+
+	if (IsTurnBased() && lcf::Data::battlecommands.battle_type == lcf::rpg::BattleCommands::BattleType_traditional) {
+		// Fight/Auto/Escape menu above the monster list
+		options_window->SetZ(Priority_Window + 20);
+	}
 
 	ally_cursor.reset(new Sprite());
 	enemy_cursor.reset(new Sprite());
@@ -749,7 +759,7 @@ void Scene_Battle_Rpg2k3::SetState(Scene_Battle::State new_state) {
 	SetSceneActionSubState(0);
 
 #ifdef EP_DEBUG_BATTLE2K3_STATE_MACHINE
-	Output::Debug("Battle2k3 SetState state={} prev={} auto_battle={}", state, previous_state, auto_battle);
+	Output::Debug("Battle2k3 SetState state={} prev={} auto_battle={}", static_cast<int>(state), static_cast<int>(previous_state), auto_battle);
 #endif
 }
 
@@ -800,6 +810,160 @@ int Scene_Battle_Rpg2k3::GetNextReadyActor() {
 	return -1;
 }
 
+bool Scene_Battle_Rpg2k3::IsTurnBased() const {
+	return turn_based;
+}
+
+void Scene_Battle_Rpg2k3::StartTurnCommandPhase() {
+	turn_commanded_actors.clear();
+	atb_order.clear();
+
+	// Back attack and pincers: the enemies get a free first round
+	const auto cond = Game_Battle::GetBattleCondition();
+	const bool actors_surprised = Game_Battle::GetTurn() == 0
+		&& (cond == lcf::rpg::System::BattleCondition_back || cond == lcf::rpg::System::BattleCondition_pincers);
+
+	for (auto* enemy: Main_Data::game_enemyparty->GetEnemies()) {
+		enemy->SetAtbGauge(0);
+	}
+	// A full gauge marks the actors who still need a command this round
+	for (auto* actor: Main_Data::game_party->GetActors()) {
+		const bool needs_command = !actors_surprised && actor->Exists() && actor->CanAct();
+		actor->SetAtbGauge(needs_command ? Game_Battler::GetMaxAtbGauge() : 0);
+	}
+	UpdateReadyActors();
+}
+
+void Scene_Battle_Rpg2k3::QueueTurnAction(Game_Battler* battler) {
+	battler->SetAtbGauge(0);
+	Scene_Battle::ActionSelectedCallback(battler);
+}
+
+bool Scene_Battle_Rpg2k3::ReturnToPreviousActor() {
+	if (!IsTurnBased()) {
+		return false;
+	}
+
+	while (!turn_commanded_actors.empty()) {
+		auto* actor = turn_commanded_actors.back();
+		turn_commanded_actors.pop_back();
+
+		auto it = std::find(battle_actions.begin(), battle_actions.end(), actor);
+		if (it == battle_actions.end()) {
+			continue;
+		}
+		battle_actions.erase(it);
+		actor->SetBattleAlgorithm(nullptr);
+		actor->SetAtbGauge(Game_Battler::GetMaxAtbGauge());
+		if (!BattlerReadyToAct(actor)) {
+			actor->SetAtbGauge(0);
+			continue;
+		}
+
+		// The actor chooses again, before the others still waiting
+		atb_order.erase(std::remove(atb_order.begin(), atb_order.end(), actor->GetId()), atb_order.end());
+		atb_order.insert(atb_order.begin(), actor->GetId());
+
+		Main_Data::game_system->SePlay(Main_Data::game_system->GetSystemSE(Main_Data::game_system->SFX_Cancel));
+		SetActiveActor(Main_Data::game_party->GetActorPositionInParty(actor->GetId()));
+		command_window->SetIndex(0);
+		SetState(State_SelectCommand);
+		return true;
+	}
+	return false;
+}
+
+void Scene_Battle_Rpg2k3::StartTurnExecution() {
+	const auto cond = Game_Battle::GetBattleCondition();
+	// First strike, initiative and surround: the enemies skip the first round
+	const bool enemies_surprised = Game_Battle::GetTurn() == 0
+		&& (first_strike
+			|| cond == lcf::rpg::System::BattleCondition_initiative
+			|| cond == lcf::rpg::System::BattleCondition_surround);
+
+	// The party turn counts rounds. Like RPG Maker 2000, it is increased before the enemies choose.
+	Main_Data::game_party->IncTurns();
+	Game_Battle::GetInterpreterBattle().ResetPagesExecuted();
+
+	if (!enemies_surprised) {
+		for (auto* enemy: Main_Data::game_enemyparty->GetEnemies()) {
+			if (!enemy->Exists() || enemy->GetBattleAlgorithm()) {
+				continue;
+			}
+			if (!EnemyAi::SetStateRestrictedAction(*enemy)) {
+				if (enemy->GetEnemyAi() == -1) {
+					enemyai_algos[default_enemyai_algo]->SetEnemyAiAction(*enemy);
+				} else {
+					enemyai_algos[enemy->GetEnemyAi()]->SetEnemyAiAction(*enemy);
+				}
+			}
+			assert(enemy->GetBattleAlgorithm() != nullptr);
+			QueueTurnAction(enemy);
+		}
+	}
+
+	// Fastest first. Equal agility keeps the order the actions were chosen in (actors before enemies).
+	for (auto* battler: battle_actions) {
+		int battle_order = battler->GetAgi();
+		// "Preemptive attack" weapons make a normal attack go first, as in RPG Maker 2000
+		if (battler->GetBattleAlgorithm()->GetType() == Game_BattleAlgorithm::Type::Normal && battler->HasPreemptiveAttack()) {
+			battle_order += 9999;
+		}
+		battler->SetBattleOrderAgi(battle_order);
+	}
+	std::stable_sort(battle_actions.begin(), battle_actions.end(),
+			[](Game_Battler* l, Game_Battler* r) {
+			return l->GetBattleOrderAgi() > r->GetBattleOrderAgi();
+			});
+
+#ifdef EP_DEBUG_BATTLE2K3_STATE_MACHINE
+	for (auto* battler: battle_actions) {
+		Output::Debug("Battle2k3 TurnOrder turn={} name={} agi={}", Game_Battle::GetTurn(), battler->GetName(), battler->GetBattleOrderAgi());
+	}
+#endif
+
+	turn_executing = true;
+	turn_commanded_actors.clear();
+	SetActiveActor(-1);
+	SetState(State_Battle);
+}
+
+void Scene_Battle_Rpg2k3::EndTurn() {
+	turn_executing = false;
+	first_strike = false;
+	Scene_Battle::first_strike = false;
+
+	// States wear off, and poison or regeneration apply, once per round
+	std::vector<Game_Battler*> battlers;
+	Main_Data::game_party->GetActiveBattlers(battlers);
+	Main_Data::game_enemyparty->GetActiveBattlers(battlers);
+	for (auto* battler: battlers) {
+		ApplyStateConditions(*battler);
+	}
+	status_window->Refresh();
+
+	StartTurnCommandPhase();
+}
+
+void Scene_Battle_Rpg2k3::ApplyStateConditions(Game_Battler& battler) {
+	battler.BattleStateHeal();
+	int damageTaken = battler.ApplyConditions();
+	if (damageTaken != 0) {
+		DrawFloatText(
+				battler.GetBattlePosition().x,
+				battler.GetBattlePosition().y,
+				damageTaken < 0 ? Font::ColorDefault : Font::ColorHeal,
+				std::to_string(std::abs(damageTaken)),
+				&battler,
+				damageTaken < 0 ? Scene_Battle_Rpg2k3::FloatTextType::Damage : Scene_Battle_Rpg2k3::FloatTextType::Heal);
+	}
+	if (battler.GetType() == Game_Battler::Type_Ally) {
+		auto* sprite = static_cast<Game_Actor&>(battler).GetActorBattleSprite();
+		if (sprite) {
+			sprite->DetectStateChange();
+		}
+	}
+}
 
 bool Scene_Battle_Rpg2k3::IsAtbAccumulating() const {
 	if (Game_Battle::IsBattleAnimationWaiting()) {
@@ -884,12 +1048,24 @@ void Scene_Battle_Rpg2k3::CreateActorAutoActions() {
 		}
 
 		actor->SetLastBattleAction(-1);
-		ActionSelectedCallback(actor);
+		if (IsTurnBased()) {
+			QueueTurnAction(actor);
+		} else {
+			ActionSelectedCallback(actor);
+		}
 	}
 }
 
 bool Scene_Battle_Rpg2k3::UpdateAtb() {
 	if (Game_Battle::GetInterpreter().IsRunning() || Game_Message::IsMessageActive()) {
+		return true;
+	}
+	if (IsTurnBased()) {
+		// Cancel during an auto battle round: the player chooses the commands of the next round
+		if (auto_battle && turn_executing && Input::IsTriggered(Input::CANCEL)) {
+			auto_battle = false;
+			Main_Data::game_system->SePlay(Main_Data::game_system->GetSystemSE(Main_Data::game_system->SFX_Cancel));
+		}
 		return true;
 	}
 	if (IsAtbAccumulating()) {
@@ -992,8 +1168,12 @@ void Scene_Battle_Rpg2k3::vUpdate() {
 }
 
 void Scene_Battle_Rpg2k3::NextTurn(Game_Battler* battler) {
-	Main_Data::game_party->IncTurns();
 	battler->NextBattleTurn();
+	// Turn based battles count the party turns by rounds (StartTurnExecution)
+	if (IsTurnBased()) {
+		return;
+	}
+	Main_Data::game_party->IncTurns();
 	Game_Battle::GetInterpreterBattle().ResetPagesExecuted();
 }
 
@@ -1067,7 +1247,7 @@ Scene_Battle_Rpg2k3::SceneActionReturn Scene_Battle_Rpg2k3::ProcessSceneAction()
 	if (state != last_state || scene_action_substate != last_substate) {
 		int actor_id = active_actor ? active_actor->GetId() : 0;
 		std::string_view actor_name = active_actor ? std::string_view(active_actor->GetName()) : "Null";
-		Output::Debug("Battle2k3 ProcessSceneAction({}, {}) actor={}({}) frames={} auto_battle={}", state, scene_action_substate, actor_name, actor_id, Main_Data::game_system->GetFrameCounter(), auto_battle);
+		Output::Debug("Battle2k3 ProcessSceneAction({}, {}) actor={}({}) frames={} auto_battle={}", static_cast<int>(state), scene_action_substate, actor_name, actor_id, Main_Data::game_system->GetFrameCounter(), auto_battle);
 		last_state = state;
 		last_substate = scene_action_substate;
 	}
@@ -1180,7 +1360,9 @@ Scene_Battle_Rpg2k3::SceneActionReturn Scene_Battle_Rpg2k3::ProcessSceneActionFi
 		ResetWindows(true);
 		target_window->SetIndex(-1);
 
-		if (lcf::Data::battlecommands.battle_type == lcf::rpg::BattleCommands::BattleType_traditional
+		// RPG Maker 2003 has no Fight/Auto/Escape menu in the traditional layout; turn based battles have it, like RPG Maker 2000
+		const bool has_menu = IsTurnBased() || lcf::Data::battlecommands.battle_type != lcf::rpg::BattleCommands::BattleType_traditional;
+		if (!has_menu
 				|| ((std::find(battle_options.begin(), battle_options.end(), AutoBattle) == battle_options.end()) && (std::find(battle_options.begin(), battle_options.end(), Win) == battle_options.end()) && (std::find(battle_options.begin(), battle_options.end(), Lose) == battle_options.end()) && !IsEscapeAllowedFromOptionWindow())) {
 			if (lcf::Data::battlecommands.battle_type != lcf::rpg::BattleCommands::BattleType_traditional) MoveCommandWindows(Player::menu_offset_x - options_window->GetWidth(), 1);
 			SetState(State_SelectActor);
@@ -1206,7 +1388,10 @@ Scene_Battle_Rpg2k3::SceneActionReturn Scene_Battle_Rpg2k3::ProcessSceneActionFi
 
 		options_window->SetVisible(true);
 		status_window->SetVisible(true);
-		if (lcf::Data::battlecommands.battle_type != lcf::rpg::BattleCommands::BattleType_gauge) {
+		if (lcf::Data::battlecommands.battle_type == lcf::rpg::BattleCommands::BattleType_traditional) {
+			// The menu covers the monster list, like the hero commands do
+			target_window->SetVisible(true);
+		} else if (lcf::Data::battlecommands.battle_type != lcf::rpg::BattleCommands::BattleType_gauge) {
 			command_window->SetVisible(true);
 		}
 		SetActiveActor(-1);
@@ -1299,6 +1484,21 @@ Scene_Battle_Rpg2k3::SceneActionReturn Scene_Battle_Rpg2k3::ProcessSceneActionAc
 		SetSceneActionSubState(eWaitInput);
 	}
 
+	if (IsTurnBased()) {
+		// Back from a failed escape in the middle of the round: go on with the round
+		if (turn_executing) {
+			SetState(State_Battle);
+			return SceneActionReturn::eContinueThisFrame;
+		}
+		CreateActorAutoActions();
+		UpdateReadyActors();
+		// Every actor has a command: the round begins
+		if (atb_order.empty()) {
+			StartTurnExecution();
+			return SceneActionReturn::eContinueThisFrame;
+		}
+	}
+
 	if (scene_action_substate == eWaitInput) {
 		UpdateReadyActors();
 
@@ -1328,13 +1528,16 @@ Scene_Battle_Rpg2k3::SceneActionReturn Scene_Battle_Rpg2k3::ProcessSceneActionAc
 	}
 
 	// If any battler is waiting to attack, immediately interrupt and do the attack.
-	if (IsBattleActionPending()) {
+	if (!IsTurnBased() && IsBattleActionPending()) {
 		SetState(State_Battle);
 		return SceneActionReturn::eContinueThisFrame;
 	}
 
 	if (scene_action_substate == eWaitInput) {
 		if (Input::IsTriggered(Input::CANCEL)) {
+			if (ReturnToPreviousActor()) {
+				return SceneActionReturn::eWaitTillNextFrame;
+			}
 			SetActiveActor(-1);
 			Main_Data::game_system->SePlay(Main_Data::game_system->GetSystemSE(Main_Data::game_system->SFX_Cancel));
 			SetState(State_SelectOption);
@@ -1361,8 +1564,11 @@ Scene_Battle_Rpg2k3::SceneActionReturn Scene_Battle_Rpg2k3::ProcessSceneActionAc
 			return SceneActionReturn::eWaitTillNextFrame;
 		}
 
-		if (lcf::Data::battlecommands.battle_type != lcf::rpg::BattleCommands::BattleType_traditional) {
+		if (IsTurnBased() || lcf::Data::battlecommands.battle_type != lcf::rpg::BattleCommands::BattleType_traditional) {
 			if (Input::IsTriggered(Input::CANCEL)) {
+				if (ReturnToPreviousActor()) {
+					return SceneActionReturn::eWaitTillNextFrame;
+				}
 				SetActiveActor(-1);
 				Main_Data::game_system->SePlay(Main_Data::game_system->GetSystemSE(Main_Data::game_system->SFX_Cancel));
 				SetState(State_SelectOption);
@@ -1397,8 +1603,19 @@ Scene_Battle_Rpg2k3::SceneActionReturn Scene_Battle_Rpg2k3::ProcessSceneActionAu
 		SetSceneActionSubState(eWaitInput);
 	}
 
-	// If any battler is waiting to attack, immediately interrupt and do the attack.
-	if (IsBattleActionPending()) {
+	if (IsTurnBased()) {
+		if (turn_executing) {
+			SetState(State_Battle);
+			return SceneActionReturn::eContinueThisFrame;
+		}
+		CreateActorAutoActions();
+		UpdateReadyActors();
+		if (atb_order.empty()) {
+			StartTurnExecution();
+			return SceneActionReturn::eContinueThisFrame;
+		}
+	} else if (IsBattleActionPending()) {
+		// If any battler is waiting to attack, immediately interrupt and do the attack.
 		SetState(State_Battle);
 		return SceneActionReturn::eContinueThisFrame;
 	}
@@ -1438,7 +1655,7 @@ Scene_Battle_Rpg2k3::SceneActionReturn Scene_Battle_Rpg2k3::ProcessSceneActionCo
 	}
 
 	// If any battler is waiting to attack, immediately interrupt and do the attack.
-	if (Main_Data::game_system->GetAtbMode() == lcf::rpg::SaveSystem::AtbMode_atb_active && IsBattleActionPending()) {
+	if (!IsTurnBased() && Main_Data::game_system->GetAtbMode() == lcf::rpg::SaveSystem::AtbMode_atb_active && IsBattleActionPending()) {
 		SetState(State_Battle);
 		return SceneActionReturn::eContinueThisFrame;
 	}
@@ -1489,7 +1706,10 @@ Scene_Battle_Rpg2k3::SceneActionReturn Scene_Battle_Rpg2k3::ProcessSceneActionCo
 			}
 			return SceneActionReturn::eWaitTillNextFrame;
 		}
-		if (lcf::Data::battlecommands.battle_type != lcf::rpg::BattleCommands::BattleType_traditional) {
+		if (Input::IsTriggered(Input::CANCEL) && ReturnToPreviousActor()) {
+			return SceneActionReturn::eWaitTillNextFrame;
+		}
+		if (IsTurnBased() || lcf::Data::battlecommands.battle_type != lcf::rpg::BattleCommands::BattleType_traditional) {
 			if (Input::IsTriggered(Input::CANCEL)) {
 				Main_Data::game_system->SePlay(Main_Data::game_system->GetSystemSE(Main_Data::game_system->SFX_Cancel));
 				SetState(State_SelectOption);
@@ -1705,6 +1925,12 @@ Scene_Battle_Rpg2k3::SceneActionReturn Scene_Battle_Rpg2k3::ProcessSceneActionBa
 	}
 
 	if (scene_action_substate == ePreAction) {
+		if (IsTurnBased()) {
+			// Battlers killed or removed before their turn lose their action
+			while (!battle_actions.empty() && !battle_actions.front()->Exists()) {
+				RemoveCurrentAction();
+			}
+		}
 		if (battle_actions.empty()) {
 			SetSceneActionSubState(ePost);
 			return SceneActionReturn::eContinueThisFrame;
@@ -1756,6 +1982,13 @@ Scene_Battle_Rpg2k3::SceneActionReturn Scene_Battle_Rpg2k3::ProcessSceneActionBa
 	}
 
 	if (scene_action_substate == ePost) {
+		if (IsTurnBased() && turn_executing) {
+			// Everybody acted: next round
+			EndTurn();
+			SetWait(10, 10);
+			ReturnToMainBattleState();
+			return SceneActionReturn::eWaitTillNextFrame;
+		}
 		// If the selected actor acted, or if they were killed / removed, then cancel out of their menus
 		if (active_actor == nullptr || !active_actor->Exists()) {
 			ReturnToMainBattleState();
@@ -1967,7 +2200,15 @@ Scene_Battle_Rpg2k3::SceneActionReturn Scene_Battle_Rpg2k3::ProcessSceneActionEs
 	};
 
 	if (scene_action_substate == eBegin) {
-		if (previous_state == State_SelectOption || TryEscape()) {
+		// RPG Maker 2003 only allows the menu escape when it always works (start of a first strike).
+		// Turn based battles allow it every round, with the RPG Maker 2000 chance.
+		const bool party_escape = previous_state == State_SelectOption;
+		const auto cond = Game_Battle::GetBattleCondition();
+		const bool sure_escape = party_escape && (!IsTurnBased()
+				|| (Game_Battle::GetTurn() == 0 && (first_strike
+					|| cond == lcf::rpg::System::BattleCondition_initiative
+					|| cond == lcf::rpg::System::BattleCondition_surround)));
+		if (sure_escape || TryEscape()) {
 			// There is no success text for escape in 2k3, however 2k3 still waits the same as if there was.
 			Main_Data::game_system->SePlay(Main_Data::game_system->GetSystemSE(Main_Data::game_system->SFX_Escape));
 			for (auto& actor: Main_Data::game_party->GetActors()) {
@@ -1988,6 +2229,22 @@ Scene_Battle_Rpg2k3::SceneActionReturn Scene_Battle_Rpg2k3::ProcessSceneActionEs
 
 	if (scene_action_substate == eFailure) {
 		EndNotification();
+		if (IsTurnBased() && previous_state == State_SelectOption) {
+			// RPG Maker 2000: the heroes lose their turn and the monsters act
+			for (auto* actor: Main_Data::game_party->GetActors()) {
+				battle_actions.erase(std::remove(battle_actions.begin(), battle_actions.end(), actor), battle_actions.end());
+				actor->SetBattleAlgorithm(nullptr);
+				actor->SetAtbGauge(0);
+			}
+			atb_order.clear();
+			// The menu leaves the screen, as when choosing Fight
+			MoveCommandWindows(Player::menu_offset_x - options_window->GetWidth(), 8);
+			if (lcf::Data::battlecommands.battle_type == lcf::rpg::BattleCommands::BattleType_traditional) {
+				options_window->SetVisible(false);
+			}
+			StartTurnExecution();
+			return SceneActionReturn::eContinueThisFrame;
+		}
 		ReturnToMainBattleState();
 		return SceneActionReturn::eContinueThisFrame;
 	}
@@ -2212,31 +2469,18 @@ Scene_Battle_Rpg2k3::BattleActionReturn Scene_Battle_Rpg2k3::ProcessBattleAction
 Scene_Battle_Rpg2k3::BattleActionReturn Scene_Battle_Rpg2k3::ProcessBattleActionConditions(Game_BattleAlgorithm::AlgorithmBase* action) {
 	(void)action;
 
-	std::vector<Game_Battler*> battlers;
-	Main_Data::game_party->GetActiveBattlers(battlers);
-	Main_Data::game_enemyparty->GetActiveBattlers(battlers);
+	// Turn based battles apply the states once per round instead (EndTurn)
+	if (!IsTurnBased()) {
+		std::vector<Game_Battler*> battlers;
+		Main_Data::game_party->GetActiveBattlers(battlers);
+		Main_Data::game_enemyparty->GetActiveBattlers(battlers);
 
-	for (auto* b : battlers) {
-		b->BattleStateHeal();
-		int damageTaken = b->ApplyConditions();
-		if (damageTaken != 0) {
-			DrawFloatText(
-					b->GetBattlePosition().x,
-					b->GetBattlePosition().y,
-					damageTaken < 0 ? Font::ColorDefault : Font::ColorHeal,
-					std::to_string(std::abs(damageTaken)),
-					b,
-					damageTaken < 0 ? Scene_Battle_Rpg2k3::FloatTextType::Damage : Scene_Battle_Rpg2k3::FloatTextType::Heal);
+		for (auto* b : battlers) {
+			ApplyStateConditions(*b);
 		}
-		if (b->GetType() == Game_Battler::Type_Ally) {
-			auto* sprite = static_cast<Game_Actor*>(b)->GetActorBattleSprite();
-			if (sprite) {
-				sprite->DetectStateChange();
-			}
-		}
+
+		status_window->Refresh();
 	}
-
-	status_window->Refresh();
 
 	SetBattleActionState(BattleActionState_Notify);
 	return BattleActionReturn::eContinue;
@@ -2761,6 +3005,11 @@ Scene_Battle_Rpg2k3::BattleActionReturn Scene_Battle_Rpg2k3::ProcessBattleAction
 }
 
 bool Scene_Battle_Rpg2k3::IsEscapeAllowedFromOptionWindow() const {
+	if (IsTurnBased()) {
+		// The party can try every round, like RPG Maker 2000
+		return IsEscapeAllowedFromActorCommand();
+	}
+
 	auto cond = Game_Battle::GetBattleCondition();
 
 	return Scene_Battle::IsEscapeAllowed() && (Game_Battle::GetTurn() == 0)
@@ -2845,6 +3094,10 @@ void Scene_Battle_Rpg2k3::RowSelected() {
 
 void Scene_Battle_Rpg2k3::ActionSelectedCallback(Game_Battler* for_battler) {
 	for_battler->SetAtbGauge(0);
+
+	if (IsTurnBased() && for_battler == active_actor) {
+		turn_commanded_actors.push_back(active_actor);
+	}
 
 	if (for_battler == active_actor) {
 		auto idx = GetNextReadyActor();

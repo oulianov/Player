@@ -112,6 +112,9 @@ void Window_BattleStatus::Refresh() {
 
 void Window_BattleStatus::RefreshGauge() {
 	if (Feature::HasRpg2k3BattleSystem()) {
+		// Turn based battles have no time gauge
+		const bool show_atb = !Feature::HasRpg2k3TurnBasedBattle();
+
 		if (lcf::Data::battlecommands.battle_type == lcf::rpg::BattleCommands::BattleType_alternative) {
 			if (lcf::Data::battlecommands.window_size == lcf::rpg::BattleCommands::WindowSize_small) {
 				contents->ClearRect(Rect(192, 0, 45, 58));
@@ -142,26 +145,31 @@ void Window_BattleStatus::RefreshGauge() {
 					DrawActorFace(*static_cast<const Game_Actor*>(actor), 80 * i, actor_face_height);
 
 					int x = 32 + i * 80;
-					int y = actor_face_height;
+					// The frame has one 16 pixel row per gauge (HP, SP, time): without the time gauge, only the first two,
+					// at the bottom of the face (48 pixels high)
+					const int frame_h = show_atb ? 48 : 32;
+					int y = actor_face_height + 48 - frame_h;
 
 					// Left Gauge
-					contents->Blit(x, y, *system2, Rect(0, 32, 16, 48), Opacity::Opaque());
+					contents->Blit(x, y, *system2, Rect(0, 32, 16, frame_h), Opacity::Opaque());
 					x += 16;
 
 					// Center
 					const auto fill_x = x;
-					contents->StretchBlit(Rect(x, y, 25, 48), *system2, Rect(16, 32, 16, 48), Opacity::Opaque());
+					contents->StretchBlit(Rect(x, y, 25, frame_h), *system2, Rect(16, 32, 16, frame_h), Opacity::Opaque());
 					x += 25;
 
 					// Right
-					contents->Blit(x, y, *system2, Rect(32, 32, 16, 48), Opacity::Opaque());
+					contents->Blit(x, y, *system2, Rect(32, 32, 16, frame_h), Opacity::Opaque());
 
 					// HP
 					DrawGaugeSystem2(fill_x, y, actor->GetHp(), actor->GetMaxHp(), 0);
 					// SP
 					DrawGaugeSystem2(fill_x, y + 16, actor->GetSp(), actor->GetMaxSp(), 1);
 					// Gauge
-					DrawGaugeSystem2(fill_x, y + 16 * 2, actor->GetAtbGauge(), actor->GetMaxAtbGauge(), 2);
+					if (show_atb) {
+						DrawGaugeSystem2(fill_x, y + 16 * 2, actor->GetAtbGauge(), actor->GetMaxAtbGauge(), 2);
+					}
 
 					// Numbers
 					x = 40 + 80 * i;
@@ -174,14 +182,14 @@ void Window_BattleStatus::RefreshGauge() {
 
 				if (lcf::Data::battlecommands.battle_type == lcf::rpg::BattleCommands::BattleType_alternative) {
 					// RPG_RT Bug (?): Gauge hidden when selected due to transparency (wrong color when rendering)
-					if (lcf::Data::battlecommands.transparency == lcf::rpg::BattleCommands::Transparency_opaque || (menu_item_height / 8 + index * menu_item_height != y)) {
+					if (show_atb && (lcf::Data::battlecommands.transparency == lcf::rpg::BattleCommands::Transparency_opaque || (menu_item_height / 8 + index * menu_item_height != y))) {
 						DrawGauge(*actor, 202 - 10, y - 2, lcf::Data::battlecommands.transparency == lcf::rpg::BattleCommands::Transparency_opaque ? 96 : 255);
 					}
 					int hpdigits = (actor->MaxHpValue() >= 1000) ? 4 : 3;
 					int spdigits = (actor->MaxSpValue() >= 1000) ? 4 : 3;
 					DrawActorHp(*actor, 178 - hpdigits * 6 - spdigits * 6, y, hpdigits, true);
 					DrawActorSp(*actor, 220 - spdigits * 6, y, spdigits, false);
-				} else {
+				} else if (show_atb) {
 					DrawGauge(*actor, 156, y - 2);
 				}
 			}
