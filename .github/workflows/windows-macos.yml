@@ -1,8 +1,7 @@
 name: Windows and macOS
 
+# run by hand only (Actions > Windows and macOS > Run workflow)
 on:
-  push:
-  pull_request:
   workflow_dispatch:
     inputs:
       git-ref:
@@ -39,11 +38,13 @@ jobs:
         shell: pwsh
         run: |
           $vcpkg = "$env:RUNNER_TEMP\buildscripts\windows\vcpkg"
+          $zip = "$env:RUNNER_TEMP\toolchain-windows.zip"
           New-Item -ItemType Directory -Force $vcpkg | Out-Null
-          curl.exe -fsSL -o "$env:RUNNER_TEMP\toolchain-windows.zip" https://ci.easyrpg.org/downloads/windows/toolchain-windows.zip
+          curl.exe -fsSL -o $zip https://ci.easyrpg.org/downloads/windows/toolchain-windows.zip
           # Windows' tar (bsdtar) reads zip files, Git's does not
-          & "$env:SystemRoot\System32\tar.exe" -xf "$env:RUNNER_TEMP\toolchain-windows.zip" -C $vcpkg --strip-components=1
-          "EASYRPG_BUILDSCRIPTS=$env:RUNNER_TEMP\buildscripts" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          & "$env:SystemRoot\System32\tar.exe" -xf $zip -C $vcpkg --strip-components=1
+          "EASYRPG_BUILDSCRIPTS=$env:RUNNER_TEMP\buildscripts" |
+            Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: Configure
         run: |
@@ -80,7 +81,8 @@ jobs:
       - name: Install dependencies
         run: |
           brew install --quiet ninja pkgconf dylibbundler sdl3 icu4c expat inih nlohmann-json \
-            libpng fmt pixman freetype harfbuzz lhasa speexdsp mpg123 libsndfile libvorbis opusfile libxmp
+            libpng fmt pixman freetype harfbuzz lhasa speexdsp mpg123 libsndfile libvorbis \
+            opusfile libxmp
           # ICU and expat are keg-only: CMake is told where they are
           icu=$(ls -d "$(brew --prefix)"/opt/icu4c* | sort -V | tail -1)
           echo "PREFIX_PATH=$icu;$(brew --prefix expat)" >> "$GITHUB_ENV"
@@ -114,13 +116,14 @@ jobs:
       - name: Package
         run: |
           app="build/EasyRPG Player.app"
-          dylibbundler -od -b -cd -x "$app/Contents/MacOS/EasyRPG Player" -d "$app/Contents/libs/" -p @executable_path/../libs/
+          exe="$app/Contents/MacOS/EasyRPG Player"
+          dylibbundler -od -b -cd -x "$exe" -d "$app/Contents/libs/" -p @executable_path/../libs/
           codesign --force --deep --sign - "$app"
-          if otool -L "$app/Contents/MacOS/EasyRPG Player" "$app"/Contents/libs/*.dylib | grep -q "$(brew --prefix)"; then
+          if otool -L "$exe" "$app"/Contents/libs/*.dylib | grep -q "$(brew --prefix)"; then
             echo "::error::The app still uses libraries of Homebrew"
             exit 1
           fi
-          "$app/Contents/MacOS/EasyRPG Player" --version
+          "$exe" --version
           ditto -c -k --keepParent "$app" easyrpg-player-macos-arm64.zip
 
       - name: Upload

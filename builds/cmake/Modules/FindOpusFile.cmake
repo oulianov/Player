@@ -24,6 +24,10 @@
 # ``OPUSFILE_FOUND``
 #   true if the Opusfile headers and libraries were found.
 
+# The name of the module and of its package (OpusFile) are older than the
+# linter's rules for them
+# lint_cmake: -convention/filename,-package/stdargs
+
 find_package(PkgConfig QUIET)
 
 pkg_check_modules(PC_OPUSFILE QUIET opusfile)
