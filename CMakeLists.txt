@@ -907,7 +907,8 @@ if(CMAKE_HOST_APPLE AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/.git")
 else()
 	set(PLAYER_LIBLCF_SUBMODULE OFF)
 endif()
-option(PLAYER_BUILD_LIBLCF "For developers: Clone liblcf and builds it along with the Player." ${PLAYER_LIBLCF_SUBMODULE})
+option(PLAYER_BUILD_LIBLCF "For developers: Clone liblcf and builds it along with the Player."
+	${PLAYER_LIBLCF_SUBMODULE})
 set(PLAYER_BUILD_LIBLCF_GIT "https://github.com/EasyRPG/liblcf.git"
 	CACHE STRING "Git repository of liblcf to clone. Requires PLAYER_BUILD_LIBLCF=ON.")
 set(PLAYER_BUILD_LIBLCF_BRANCH "master"
