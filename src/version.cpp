@@ -31,6 +31,9 @@
 	#define EP_VERSION_PATCH 1
 	#define EP_VERSION_TWEAK 0
 
+	// The letter of this fork after the version (0.8.1a), as CMakeLists.txt
+	#define EP_VERSION_SUFFIX "a"
+
 	// concatenate short version string
 	#define _VER1 TO_STRING(EP_VERSION_MAJOR) "." TO_STRING(EP_VERSION_MINOR)
 	#if EP_VERSION_TWEAK > 0
@@ -39,9 +42,9 @@
 		#define _VER2 TO_STRING(EP_VERSION_PATCH)
 	#endif
 	#ifdef _VER2
-		#define EP_VERSION _VER1 "." _VER2
+		#define EP_VERSION _VER1 "." _VER2 EP_VERSION_SUFFIX
 	#else
-		#define EP_VERSION _VER1
+		#define EP_VERSION _VER1 EP_VERSION_SUFFIX
 	#endif
 #endif
 

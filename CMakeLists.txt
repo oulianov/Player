@@ -518,7 +518,9 @@ if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
 endif()
 
 # Version setup
-set(PLAYER_VERSION ${PROJECT_VERSION})
+# This fork adds a letter to the version of the Player it is based on (0.8.1a), the numbers stay
+set(PLAYER_VERSION_SUFFIX "a")
+set(PLAYER_VERSION ${PROJECT_VERSION}${PLAYER_VERSION_SUFFIX})
 if(NOT PROJECT_VERSION_TWEAK)
 	# a kludge to match the valid version format
 	set(PROJECT_VERSION_TWEAK 0)
