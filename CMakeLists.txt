@@ -897,25 +897,26 @@ set(CMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY "")
 set(CMAKE_XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "org.easyrpg.player")
 
 # liblcf
-# A git checkout has liblcf as the lib/liblcf submodule: it is built along by default
+# On macOS, a git checkout builds liblcf along by default: the lib/liblcf submodule, fetched from GitHub.
+# Elsewhere (Linux...), PLAYER_BUILD_LIBLCF clones PLAYER_BUILD_LIBLCF_BRANCH of PLAYER_BUILD_LIBLCF_GIT.
 set(LIBLCF_PATH "${CMAKE_CURRENT_SOURCE_DIR}/lib/liblcf")
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/.git" AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/.gitmodules")
-	set(PLAYER_BUILD_LIBLCF_DEFAULT ON)
+if(CMAKE_HOST_APPLE AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/.git")
+	set(PLAYER_LIBLCF_SUBMODULE ON)
 else()
-	set(PLAYER_BUILD_LIBLCF_DEFAULT OFF)
+	set(PLAYER_LIBLCF_SUBMODULE OFF)
 endif()
-option(PLAYER_BUILD_LIBLCF "Build liblcf along with the Player: the lib/liblcf submodule, or a clone of PLAYER_BUILD_LIBLCF_GIT." ${PLAYER_BUILD_LIBLCF_DEFAULT})
+option(PLAYER_BUILD_LIBLCF "For developers: Clone liblcf and builds it along with the Player." ${PLAYER_LIBLCF_SUBMODULE})
 set(PLAYER_BUILD_LIBLCF_GIT "https://github.com/EasyRPG/liblcf.git"
-	CACHE STRING "Git repository of liblcf to clone when there is no lib/liblcf. Requires PLAYER_BUILD_LIBLCF=ON.")
+	CACHE STRING "Git repository of liblcf to clone. Requires PLAYER_BUILD_LIBLCF=ON.")
 set(PLAYER_BUILD_LIBLCF_BRANCH "master"
-	CACHE STRING "Branch of the liblcf repository to clone when there is no lib/liblcf. Requires PLAYER_BUILD_LIBLCF=ON.")
+	CACHE STRING "Branch of the liblcf repository to clone. Requires PLAYER_BUILD_LIBLCF=ON.")
 
 if(PLAYER_BUILD_LIBLCF)
 	# liblcf is built as part of this cmake file
+	# (an empty folder when the lib/liblcf submodule is not cloned)
 	if(NOT EXISTS "${LIBLCF_PATH}/CMakeLists.txt")
 		find_package(Git REQUIRED)
-		if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/.git")
-			# the submodule was not cloned (git clone without --recurse-submodules)
+		if(PLAYER_LIBLCF_SUBMODULE)
 			execute_process(COMMAND ${GIT_EXECUTABLE} submodule update --init lib/liblcf
 				WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
 		else()
@@ -1645,7 +1646,11 @@ endif()
 message(STATUS "")
 
 if(PLAYER_BUILD_LIBLCF)
-	message(STATUS "liblcf: Built along, from ${LIBLCF_PATH}")
+	if(PLAYER_LIBLCF_SUBMODULE)
+		message(STATUS "liblcf: Built from the lib/liblcf submodule")
+	else()
+		message(STATUS "liblcf: Built from ${PLAYER_BUILD_LIBLCF_GIT}")
+	endif()
 	message(STATUS "")
 endif()
 
