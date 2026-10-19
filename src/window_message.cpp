@@ -234,6 +234,10 @@ void Window_Message::StartChoiceProcessing() {
 
 void Window_Message::StartNumberInputProcessing() {
 	number_input_window->SetMaxDigits(pending_message.GetNumberInputDigits());
+	if (Player::IsPatchDynRpg()) {
+		// BetterInputNumber of the DynRPG patch: the number starts at the variable's value
+		number_input_window->SetNumber(std::max(0, Main_Data::game_variables->Get(pending_message.GetNumberInputVariable())));
+	}
 	if (IsFaceEnabled() && !Main_Data::game_system->IsMessageFaceRightPosition()) {
 		number_input_window->SetX(Player::message_box_offset_x + LeftMargin + FaceSize + RightFaceMargin);
 	} else {

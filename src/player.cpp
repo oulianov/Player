@@ -389,6 +389,9 @@ void Player::Update(bool update_scene) {
 		if (Main_Data::game_ineluki) {
 			Main_Data::game_ineluki->Update();
 		}
+		if (Main_Data::game_dynrpg) {
+			Main_Data::game_dynrpg->OnFrame(Scene::instance->type);
+		}
 		RuntimePatches::OnUpdate();
 		Scene::instance->Update();
 	}
@@ -974,6 +977,9 @@ void Player::ResetGameObjects() {
 	Main_Data::game_variables = std::make_unique<Game_Variables>(min_var, max_var);
 	Main_Data::game_variables->SetLowerLimit(lcf::Data::variables.size());
 
+	// before the actors: DynRPG plugins may change their EXP curve
+	Main_Data::game_dynrpg = std::make_unique<Game_DynRpg>();
+
 	Main_Data::game_strings = std::make_unique<Game_Strings>();
 
 	// Prevent a crash when Game_Map wants to reset the screen content
@@ -994,7 +1000,6 @@ void Player::ResetGameObjects() {
 	Main_Data::game_quit = std::make_unique<Game_Quit>();
 	Main_Data::game_switches_global = std::make_unique<Game_Switches>();
 	Main_Data::game_variables_global = std::make_unique<Game_Variables>(min_var, max_var);
-	Main_Data::game_dynrpg = std::make_unique<Game_DynRpg>();
 	Main_Data::game_ineluki = std::make_unique<Game_Ineluki>();
 	Main_Data::game_destiny = std::make_unique<Game_Destiny>();
 
@@ -1313,6 +1318,7 @@ void Player::SetupNewGame() {
 	Main_Data::game_system->SetAtbMode(static_cast<Game_System::AtbMode>(lcf::Data::battlecommands.easyrpg_default_atb_mode));
 
 	Main_Data::game_party->SetupNewGame();
+	Main_Data::game_dynrpg->OnNewGame();
 	SetupPlayerSpawn();
 	Scene::Push(std::make_shared<Scene_Map>(0));
 }

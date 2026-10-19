@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <iterator>
 #include "game_actor.h"
+#include "game_dynrpg.h"
 #include "game_battle.h"
 #include "game_constants.h"
 #include "game_party.h"
@@ -584,6 +585,14 @@ int Game_Actor::CalculateExp(int level) const {
 		base = actor.exp_base;
 		inflation = actor.exp_inflation;
 		correction = actor.exp_correction;
+	}
+
+	if (Main_Data::game_dynrpg) {
+		// exp_list[level] is the EXP of level + 1
+		if (auto exp = Main_Data::game_dynrpg->GetExpForLevel(level + 1,
+				static_cast<int>(base), static_cast<int>(inflation), static_cast<int>(correction))) {
+			return *exp;
+		}
 	}
 
 	int result = 0;

@@ -23,6 +23,7 @@
 #include "compiler.h"
 #include "string_view.h"
 #include <cstdint>
+#include <functional>
 #include <lcf/span.h>
 #include <string>
 
@@ -33,6 +34,8 @@ class Game_Variables {
 public:
 	using Var_t = int32_t;
 	using Variables_t = std::vector<Var_t>;
+	/** Called with the id and the new value before a variable is written: false keeps the old value */
+	using WriteHook = std::function<bool(int, Var_t)>;
 
 	static constexpr int max_warnings = 10;
 	static constexpr Var_t min_2k = -999'999;
@@ -46,6 +49,12 @@ public:
 	const Variables_t& GetData() const;
 
 	void SetLowerLimit(size_t limit);
+
+	/**
+	 * Calls hook before each write of a variable (DynRPG onSetVariable).
+	 * GetWritableRange and SetData don't call it.
+	 */
+	void SetWriteHook(WriteHook hook);
 
 	Var_t Get(int variable_id) const;
 	Var_t GetIndirect(int variable_id) const;
@@ -159,7 +168,10 @@ private:
 	template <typename F>
 		void WriteArray(const int first_id_a, const int last_id_a, const int first_id_b, F&& op);
 
+	bool Write(int index, Var_t value);
+
 	Variables_t _variables;
+	WriteHook write_hook;
 	Var_t _min = 0;
 	Var_t _max = 0;
 	size_t lower_limit = 0;
@@ -176,6 +188,19 @@ inline const Game_Variables::Variables_t& Game_Variables::GetData() const {
 
 inline void Game_Variables::SetLowerLimit(size_t limit) {
 	lower_limit = limit;
+}
+
+inline void Game_Variables::SetWriteHook(WriteHook hook) {
+	write_hook = std::move(hook);
+}
+
+inline bool Game_Variables::Write(int index, Var_t value) {
+	// the hook may write variables too: index the vector again after it
+	if (EP_UNLIKELY(write_hook) && !write_hook(index + 1, value)) {
+		return false;
+	}
+	_variables[index] = value;
+	return true;
 }
 
 inline int Game_Variables::GetSize() const {

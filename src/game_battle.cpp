@@ -31,6 +31,7 @@
 #include "game_pictures.h"
 #include "battle_animation.h"
 #include "game_battle.h"
+#include "game_dynrpg.h"
 #include <lcf/reader_util.h>
 #include "spriteset_battle.h"
 #include "output.h"
@@ -218,6 +219,11 @@ void Game_Battle::UpdateAtbGauges() {
 				const auto cur_atb = bat->GetAtbGauge();
 				const auto multiplier = std::max(1.0, static_cast<double>(275000 - cur_atb) / 55000.0);
 				increment = Utils::RoundTo<int>(multiplier * increment);
+			}
+
+			if (Player::IsPatchDynRpg()) {
+				// RPG::battleSpeed (ApplyBattleSpeedSetting of the DynRPG patch)
+				increment = increment * Game_DynRpg::GetBattleSpeed() / 100;
 			}
 
 			ManiacBattleHook(

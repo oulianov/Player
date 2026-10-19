@@ -24,6 +24,9 @@
 #include "game_system.h"
 #include "input.h"
 #include "player.h"
+#include "drawable.h"
+#include "game_dynrpg.h"
+#include "main_data.h"
 #include "scene_settings.h"
 #include "scene_debug.h"
 #include "scene_end.h"
@@ -54,6 +57,10 @@ void Scene_Menu::Start() {
 	// Status Window
 	menustatus_window.reset(new Window_MenuStatus(Player::menu_offset_x + menu_command_width, Player::menu_offset_y, (MENU_WIDTH - menu_command_width), MENU_HEIGHT));
 	menustatus_window->SetActive(false);
+
+	if (Player::IsPatchDynRpg()) {
+		dynrpg_overlay = Main_Data::game_dynrpg->CreateSceneOverlay(Scene::Menu);
+	}
 }
 
 void Scene_Menu::Continue(SceneType /* prev_scene */) {

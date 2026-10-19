@@ -1,5 +1,7 @@
 #include <lcf/data.h>
 #include "doctest.h"
+#include "dynrpg_expcurves.h"
+#include "dynrpg_msgcommands.h"
 #include "game_dynrpg.h"
 #include "game_variables.h"
 #include "test_mock_actor.h"
@@ -215,6 +217,66 @@ TEST_CASE("Incompatible changes") {
 	CHECK(DynRpg::ParseCommand("@FunC V2.5", args) == "func");
 	CHECK(args.size() == 1);
 	CHECK(args[0] == "4");
+}
+
+TEST_CASE("ExpBug-in curve") {
+	// [Exp_Curves] of Fighting Robots Quest
+	auto curve = [](int level, int base, int inflation, int correction) {
+		return DynRpg::ExpCurvesPlugin::Curve(level, base, inflation, correction, 85000, 1500000, 1300, 800000, 1000000);
+	};
+
+	CHECK(curve(1, 145, 1, 45) == 0);
+	const std::vector<int> exp = { 190, 464, 847, 1360, 2017, 2832, 3810, 4953, 6262, 7733, 9362 };
+	for (int level = 2; level <= 12; ++level) {
+		CHECK(curve(level, 145, 1, 45) == exp[level - 2]);
+	}
+	CHECK(curve(20, 145, 1, 45) == 27704);
+	CHECK(curve(50, 145, 1, 45) == 225669);
+	CHECK(curve(99, 145, 1, 45) == 10000000);
+
+	// the DLL's 32 bit products overflow, RPG_RT gets these values too
+	const std::vector<int> overflow = { 300, 8400, 186075, 3373680, -4866245, -7214082, -1062048, -9416665, -2077842, -3967390, -327786 };
+	for (int level = 2; level <= 12; ++level) {
+		CHECK(curve(level, 300, 300, 0) == overflow[level - 2]);
+	}
+}
+
+TEST_CASE("msg_commands codes") {
+	const MockActor m;
+
+	std::vector<int32_t> vars(400);
+	vars[0] = 5;
+	vars[1] = 3;
+	vars[2] = 4;
+	vars[3] = 112;
+	vars[394] = 17;
+	Main_Data::game_variables->SetData(vars);
+	Main_Data::game_variables->SetWarning(0);
+	lcf::Data::items[4].name = "Bolt";
+	lcf::Data::items[16].name = "Potion";
+	lcf::Data::items[111].name = "Gear";
+	lcf::Data::enemies[0].name = "Slime";
+	lcf::Data::enemies[0].drop_id = 17;
+	lcf::Data::terms.victory = "Victory";
+
+	Game_DynRpg dynrpg;
+	DynRpg::MsgCommandsPlugin plugin(dynrpg);
+	auto process = [&](const std::string& line) {
+		return plugin.ProcessLine(line);
+	};
+
+	CHECK(process(R"(           You received \I[\V[395]]!)") == "           You received Potion!");
+	CHECK(process(R"(you get \I[\V[4]]!)") == "you get Gear!");
+	CHECK(process(R"(\I[5]\V[1].)") == "Bolt5.");
+	CHECK(process(R"(\I[\m[1]] dropped)") == "Potion dropped");
+	// codes of RPG_RT stay
+	CHECK(process(R"(\C[\V[1]] and \N[\V[2]])") == R"(\C[5] and \N[3])");
+	// two nested codes leave a "]"
+	CHECK(process(R"(\I[\V[\V[3]]]!)") == "Gear]!");
+	// a wrong id gives the rest of the line minus its last character, the last enemy is rejected
+	CHECK(process(R"(\M[0] x)") == "M[0]  x");
+	CHECK(process(R"(\M[1] and \M[20]!)") == "Slime and M[20]!");
+	CHECK(process(R"(\R[3] \R[36].)") == "Victory R[36].");
 }
 
 TEST_SUITE_END();

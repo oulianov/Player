@@ -20,6 +20,7 @@
 
 #include <cstdint>
 #include <locale>
+#include <memory>
 #include <optional>
 #include <vector>
 #include <sstream>
@@ -27,16 +28,23 @@
 #include <tuple>
 #include <unordered_map>
 #include "output.h"
+#include "scene.h"
 #include "utils.h"
 #include <lcf/rpg/eventcommand.h>
 
 // Headers
+namespace lcf {
+	class INIReader;
+}
 namespace lcf::rpg {
 	class SaveEventExecFrame;
 }
 
+class Bitmap;
+class Drawable;
 class DynRpgPlugin;
 class Game_Interpreter;
+class Rect;
 
 using dyn_arg_list = const Span<std::string>;
 using dynfunc = bool(*)(dyn_arg_list);
@@ -162,6 +170,85 @@ public:
 	/** @return raw text of the DynRPG comment being invoked (e.g. "@func 1, 2") */
 	std::string_view GetCurrentComment() const { return current_comment; }
 
+	/**
+	 * DynRPG onFrame: called once per frame, in every scene.
+	 *
+	 * @param scene the current scene
+	 */
+	void OnFrame(Scene::SceneType scene);
+
+	/**
+	 * DynRPG onSetVariable: called before the engine writes a variable,
+	 * whatever writes it (event commands, battle, input...).
+	 * Plugins writing variables themselves don't trigger it, see SetVariable.
+	 *
+	 * @param id variable written
+	 * @param value its new value
+	 * @return false when a plugin prevents the write
+	 */
+	bool OnSetVariable(int id, int value);
+
+	/** DynRPG onNewGame: a new game was started. */
+	void OnNewGame();
+
+	/**
+	 * Draws what plugins draw over the scene, after it was drawn
+	 * (RPG::screen->canvas in DynRPG). See CreateSceneOverlay.
+	 */
+	void OnDrawScene(Scene::SceneType scene, Bitmap& dst);
+
+	/**
+	 * DynRPG onSystemBackgroundDrawn: the background behind the windows of
+	 * a menu was drawn, plugins may draw their own over it.
+	 */
+	void OnSystemBackgroundDrawn(Scene::SceneType scene, Bitmap& dst);
+
+	/**
+	 * @return a drawable, above the windows of the scene, that draws the
+	 *   plugins' OnDrawScene. It belongs to the scene that creates it.
+	 */
+	std::unique_ptr<Drawable> CreateSceneOverlay(Scene::SceneType scene);
+
+	/**
+	 * Writes a variable as a plugin does (RPG::variables[id] = value):
+	 * without calling OnSetVariable.
+	 */
+	void SetVariable(int id, int value);
+
+	/** @return value of a key in DynRPG.ini, empty when it isn't there */
+	std::string_view GetConfig(std::string_view section, std::string_view key) const;
+
+	/** @return whether DynRPG.ini has the key */
+	bool HasConfig(std::string_view section, std::string_view key) const;
+
+	/** @return a key of DynRPG.ini read as a number like atoi does (0 when missing or not a number) */
+	int GetConfigInt(std::string_view section, std::string_view key) const;
+
+	/** @return whether the game has the plugin DynPlugins/<name>.dll */
+	static bool HasPluginDll(std::string_view name);
+
+	/** @return the frame running the comment of a plugin call (RPG::EventScriptData) */
+	static lcf::rpg::SaveEventExecFrame& GetFrame(Game_Interpreter& interpreter);
+
+	/**
+	 * GetExpForLevel of RPG_RT, for plugins replacing the EXP curve.
+	 *
+	 * @param level level to reach
+	 * @param base EXP parameters of the class (or of the actor)
+	 * @param inflation
+	 * @param correction
+	 * @return total EXP needed to reach level, none when no plugin changes the curve
+	 */
+	std::optional<int> GetExpForLevel(int level, int base, int inflation, int correction);
+
+	/**
+	 * RPG::battleSpeed of the DynRPG patch: the ATB gauges of all battlers
+	 * fill at this percentage of their speed. Like in RPG_RT, it is kept
+	 * until the Player exits, across games.
+	 */
+	static int GetBattleSpeed() { return battle_speed; }
+	static void SetBattleSpeed(int speed) { battle_speed = speed; }
+
 private:
 	friend DynRpg::EasyRpgPlugin;
 
@@ -169,6 +256,11 @@ private:
 
 	bool Invoke(std::string_view func, dyn_arg_list args, Game_Interpreter* interpreter = nullptr);
 	void InitPlugins();
+	void LoadPluginData(int slot);
+
+	std::unique_ptr<lcf::INIReader> config;
+	bool plugin_writes_variable = false;
+	static int battle_speed;
 
 	using dyn_rpg_func = std::unordered_map<std::string, dynfunc>;
 
@@ -201,6 +293,20 @@ public:
 	virtual std::optional<lcf::rpg::EventCommand> OnEventCommand(const Game_Interpreter&, lcf::rpg::SaveEventExecFrame&) { return {}; }
 	/** See Game_DynRpg::OnFramesReset */
 	virtual void OnFramesReset(const Game_Interpreter*, int) {}
+	/** See Game_DynRpg::OnFrame */
+	virtual void OnFrame(Scene::SceneType) {}
+	/** See Game_DynRpg::OnSetVariable, false prevents the write */
+	virtual bool OnSetVariable(int, int) { return true; }
+	/** See Game_DynRpg::OnNewGame */
+	virtual void OnNewGame() {}
+	/** DynRPG onLoadGame: a game was loaded, after Load() got the plugin's save data */
+	virtual void OnLoadGame() {}
+	/** See Game_DynRpg::OnDrawScene */
+	virtual void OnDrawScene(Scene::SceneType, Bitmap&) {}
+	/** See Game_DynRpg::OnSystemBackgroundDrawn, rect is the area that was drawn */
+	virtual void OnSystemBackgroundDrawn(Bitmap&, const Rect&) {}
+	/** See Game_DynRpg::GetExpForLevel */
+	virtual std::optional<int> GetExpForLevel(int, int, int, int) { return {}; }
 
 protected:
 	Game_DynRpg& instance;

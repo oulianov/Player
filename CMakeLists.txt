@@ -109,8 +109,18 @@ add_library(${PROJECT_NAME} OBJECT
 	src/drawable_list.h
 	src/drawable_mgr.cpp
 	src/drawable_mgr.h
+	src/dynrpg_atbwaitonly.cpp
+	src/dynrpg_atbwaitonly.h
 	src/dynrpg_easyrpg.cpp
 	src/dynrpg_easyrpg.h
+	src/dynrpg_expcurves.cpp
+	src/dynrpg_expcurves.h
+	src/dynrpg_fasteratb.cpp
+	src/dynrpg_fasteratb.h
+	src/dynrpg_gameclock.cpp
+	src/dynrpg_gameclock.h
+	src/dynrpg_msgcommands.cpp
+	src/dynrpg_msgcommands.h
 	src/dynrpg_params.cpp
 	src/dynrpg_params.h
 	src/dynrpg_textplugin.cpp

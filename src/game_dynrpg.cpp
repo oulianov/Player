@@ -17,21 +17,55 @@
 
 // Headers
 #include "game_dynrpg.h"
+#include "bitmap.h"
+#include "drawable.h"
+#include "drawable_mgr.h"
 #include "filefinder.h"
 #include "game_actors.h"
 #include "game_strings.h"
 #include "game_variables.h"
 #include "main_data.h"
+#include "options.h"
 #include "output.h"
 #include "player.h"
+#include "rect.h"
 
+#include <cstdlib>
 #include <cstring>
 #include <fstream>
+#include <lcf/inireader.h>
 #include <lcf/rpg/saveeventexecframe.h>
 
+#include "dynrpg_atbwaitonly.h"
 #include "dynrpg_easyrpg.h"
+#include "dynrpg_expcurves.h"
+#include "dynrpg_fasteratb.h"
+#include "dynrpg_gameclock.h"
+#include "dynrpg_msgcommands.h"
 #include "dynrpg_textplugin.h"
 #include "dynrpg_params.h"
+#include "game_interpreter.h"
+
+int Game_DynRpg::battle_speed = 100;
+
+namespace {
+	/** Draws the plugins' OnDrawScene above the windows of a scene */
+	class DynRpgSceneOverlay : public Drawable {
+	public:
+		explicit DynRpgSceneOverlay(Scene::SceneType scene) : Drawable(Priority_Timer), scene(scene) {
+			DrawableMgr::Register(this);
+		}
+
+		void Draw(Bitmap& dst) override {
+			if (Main_Data::game_dynrpg) {
+				Main_Data::game_dynrpg->OnDrawScene(scene, dst);
+			}
+		}
+
+	private:
+		Scene::SceneType scene;
+	};
+}
 
 enum DynRpg_ParseMode {
 	ParseMode_Function,
@@ -189,9 +223,160 @@ void Game_DynRpg::InitPlugins() {
 	if (Player::IsPatchDynRpg()) {
 		plugins.emplace_back(new DynRpg::TextPlugin(*this));
 		plugins.emplace_back(new DynRpg::ParamsPlugin(*this));
+
+		auto is = FileFinder::Game() ? FileFinder::Game().OpenFile("DynRPG.ini") : Filesystem_Stream::InputStream();
+		if (is) {
+			config = std::make_unique<lcf::INIReader>(is);
+			if (config->ParseError()) {
+				Output::Debug("DynRPG: Failed to parse DynRPG.ini");
+			}
+		}
+
+		// Plugins hooking the engine: like in RPG_RT, they work when their DLL is there
+		if (HasPluginDll(DynRpg::FasterAtbPlugin::dll_name)) {
+			plugins.emplace_back(new DynRpg::FasterAtbPlugin(*this));
+		}
+		if (HasPluginDll(DynRpg::GameClockPlugin::dll_name)) {
+			plugins.emplace_back(new DynRpg::GameClockPlugin(*this));
+		}
+		if (HasPluginDll(DynRpg::AtbWaitOnlyPlugin::dll_name)) {
+			plugins.emplace_back(new DynRpg::AtbWaitOnlyPlugin(*this));
+		}
+		if (HasPluginDll(DynRpg::ExpCurvesPlugin::dll_name)) {
+			plugins.emplace_back(new DynRpg::ExpCurvesPlugin(*this));
+		}
+		if (HasPluginDll(DynRpg::MsgCommandsPlugin::dll_name)) {
+			plugins.emplace_back(new DynRpg::MsgCommandsPlugin(*this));
+		}
+
+		if (Main_Data::game_variables) {
+			Main_Data::game_variables->SetWriteHook([](int id, int value) {
+				return !Main_Data::game_dynrpg || Main_Data::game_dynrpg->OnSetVariable(id, value);
+			});
+		}
 	}
 
 	plugins_loaded = true;
+}
+
+bool Game_DynRpg::HasPluginDll(std::string_view name) {
+	auto fs = FileFinder::Game();
+	return fs && !fs.FindFile("DynPlugins", ToString(name) + ".dll").empty();
+}
+
+std::string_view Game_DynRpg::GetConfig(std::string_view section, std::string_view key) const {
+	if (!config) {
+		return {};
+	}
+	return config->GetString(section, key, "");
+}
+
+bool Game_DynRpg::HasConfig(std::string_view section, std::string_view key) const {
+	return config && config->HasValue(section, key);
+}
+
+int Game_DynRpg::GetConfigInt(std::string_view section, std::string_view key) const {
+	// the plugins read their settings with atoi
+	return std::atoi(ToString(GetConfig(section, key)).c_str());
+}
+
+void Game_DynRpg::SetVariable(int id, int value) {
+	if (id <= 0) {
+		return;
+	}
+	plugin_writes_variable = true;
+	Main_Data::game_variables->Set(id, value);
+	plugin_writes_variable = false;
+}
+
+bool Game_DynRpg::OnSetVariable(int id, int value) {
+	if (plugin_writes_variable) {
+		return true;
+	}
+	for (auto& plugin : plugins) {
+		if (!plugin->OnSetVariable(id, value)) {
+			return false;
+		}
+	}
+	return true;
+}
+
+void Game_DynRpg::OnFrame(Scene::SceneType scene) {
+	if (!Player::IsPatchDynRpg() || !Main_Data::game_variables) {
+		return;
+	}
+	InitPlugins();
+	for (auto& plugin : plugins) {
+		plugin->OnFrame(scene);
+	}
+}
+
+void Game_DynRpg::OnNewGame() {
+	if (!Player::IsPatchDynRpg()) {
+		return;
+	}
+	InitPlugins();
+	for (auto& plugin : plugins) {
+		plugin->OnNewGame();
+	}
+}
+
+void Game_DynRpg::OnDrawScene(Scene::SceneType scene, Bitmap& dst) {
+	for (auto& plugin : plugins) {
+		plugin->OnDrawScene(scene, dst);
+	}
+}
+
+void Game_DynRpg::OnSystemBackgroundDrawn(Scene::SceneType scene, Bitmap& dst) {
+	if (plugins.empty()) {
+		return;
+	}
+	Rect rect;
+	switch (scene) {
+		case Scene::Menu:
+		case Scene::Item:
+		case Scene::Skill:
+		case Scene::Equip:
+		case Scene::ActorTarget:
+		case Scene::Status:
+		case Scene::Order:
+		case Scene::End:
+		case Scene::Shop:
+		case Scene::Name:
+			rect = Rect(Player::menu_offset_x, Player::menu_offset_y, MENU_WIDTH, MENU_HEIGHT);
+			break;
+		case Scene::Save:
+		case Scene::Load:
+			// "In the save/load menu, there is only the small part at the top drawn"
+			rect = Rect(Player::menu_offset_x, Player::menu_offset_y, MENU_WIDTH, 32);
+			break;
+		default:
+			return;
+	}
+	for (auto& plugin : plugins) {
+		plugin->OnSystemBackgroundDrawn(dst, rect);
+	}
+}
+
+lcf::rpg::SaveEventExecFrame& Game_DynRpg::GetFrame(Game_Interpreter& interpreter) {
+	return interpreter.GetFrame();
+}
+
+std::optional<int> Game_DynRpg::GetExpForLevel(int level, int base, int inflation, int correction) {
+	if (!Player::IsPatchDynRpg()) {
+		return {};
+	}
+	InitPlugins();
+	for (auto& plugin : plugins) {
+		if (auto exp = plugin->GetExpForLevel(level, base, inflation, correction)) {
+			return exp;
+		}
+	}
+	return {};
+}
+
+std::unique_ptr<Drawable> Game_DynRpg::CreateSceneOverlay(Scene::SceneType scene) {
+	return std::make_unique<DynRpgSceneOverlay>(scene);
 }
 
 std::string DynRpg::ParseCommand(std::string command, std::vector<std::string>& args) {
@@ -424,7 +609,14 @@ void Game_DynRpg::Load(int slot) {
 	}
 
 	InitPlugins();
+	LoadPluginData(slot);
 
+	for (auto& plugin : plugins) {
+		plugin->OnLoadGame();
+	}
+}
+
+void Game_DynRpg::LoadPluginData(int slot) {
 	std::string filename = get_filename(slot);
 
 	auto in = FileFinder::Save().OpenInputStream(filename);

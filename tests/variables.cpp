@@ -607,4 +607,33 @@ TEST_CASE("Sort") {
 	REQUIRE_EQ(s.Get(4), 4);
 }
 
+TEST_CASE("WriteHook") {
+	auto s = make();
+	std::vector<std::pair<int, int>> calls;
+	bool written = false;
+	s.SetWriteHook([&](int id, Game_Variables::Var_t value) {
+		calls.emplace_back(id, value);
+		if (id == 2 && !written) {
+			// the hook may write variables too, even past the end
+			written = true;
+			s.Set(max_vars * 3, 7);
+		}
+		return id != 3;
+	});
+
+	REQUIRE_EQ(s.Set(1, 10), 10);
+	REQUIRE_EQ(s.Add(1, 5), 15);
+	s.SetRange(2, 4, maxval + 1);
+
+	// the new value, clamped, before the write; false keeps the old value
+	const std::vector<std::pair<int, int>> expected = {{1, 10}, {1, 15}, {2, maxval}, {max_vars * 3, 7}, {3, maxval}, {4, maxval}};
+	REQUIRE_EQ(calls, expected);
+	REQUIRE_EQ(s.Get(1), 15);
+	REQUIRE_EQ(s.Get(2), maxval);
+	REQUIRE_EQ(s.Get(3), 0);
+	REQUIRE_EQ(s.Get(4), maxval);
+	REQUIRE_EQ(s.Get(max_vars * 3), 7);
+	REQUIRE_EQ(s.Set(3, 1), 0);
+}
+
 TEST_SUITE_END();

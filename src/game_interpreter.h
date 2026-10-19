@@ -399,6 +399,7 @@ private:
 	void PushInternal(Game_CommonEvent* ev, InterpreterExecutionType ex_type);
 
 	friend class Game_Interpreter_Inspector;
+	friend class Game_DynRpg;
 };
 
 class Game_Interpreter_Inspector {

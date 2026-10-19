@@ -20,6 +20,7 @@
 
 // Headers
 #include "scene.h"
+#include "drawable.h"
 #include "window_command.h"
 #include "window_gold.h"
 #include "window_menustatus.h"
@@ -83,6 +84,9 @@ private:
 
 	/** Window displaying the heros and their status. */
 	std::unique_ptr<Window_MenuStatus> menustatus_window;
+
+	/** What DynRPG plugins draw over the menu */
+	std::unique_ptr<Drawable> dynrpg_overlay;
 
 	/** Options available in the menu. */
 	std::vector<CommandOptionType> command_options;

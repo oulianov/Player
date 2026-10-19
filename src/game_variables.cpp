@@ -156,10 +156,9 @@ Game_Variables::Var_t Game_Variables::SetOp(int variable_id, Var_t value, F&& op
 	if (EP_UNLIKELY(variable_id > static_cast<int>(_variables.size()))) {
 		_variables.resize(variable_id, 0);
 	}
-	auto& v = _variables[variable_id - 1];
-	value = op(v, value);
-	v = Utils::Clamp(value, _min, _max);
-	return v;
+	value = Utils::Clamp(op(_variables[variable_id - 1], value), _min, _max);
+	Write(variable_id - 1, value);
+	return _variables[variable_id - 1];
 }
 
 template <typename... Args>
@@ -194,8 +193,7 @@ template <typename V, typename F>
 void Game_Variables::WriteRange(const int first_id, const int last_id, V&& value, F&& op) {
 	auto& vv = _variables;
 	for (int i = std::max(0, first_id - 1); i < last_id; ++i) {
-		auto& v = vv[i];
-		v = Utils::Clamp(op(v, value()), _min, _max);
+		Write(i, Utils::Clamp(op(vv[i], value()), _min, _max));
 	}
 }
 
@@ -204,9 +202,8 @@ void Game_Variables::WriteArray(const int first_id_a, const int last_id_a, const
 	auto& vv = _variables;
 	int out_b = std::max(0, first_id_b - 1);
 	for (int i = std::max(0, first_id_a - 1); i < last_id_a; ++i) {
-		auto& v_a = vv[i];
 		auto v_b = vv[out_b++];
-		v_a = Utils::Clamp(op(v_a, v_b), _min, _max);
+		Write(i, Utils::Clamp(op(vv[i], v_b), _min, _max));
 	}
 }
 

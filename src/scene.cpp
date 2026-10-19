@@ -30,6 +30,7 @@
 #include "game_interpreter.h"
 #include "game_system.h"
 #include "main_data.h"
+#include "game_dynrpg.h"
 #include "scene_language.h"
 #include "scene_settings.h"
 #include "scene_title.h"
@@ -322,6 +323,9 @@ std::shared_ptr<Scene> Scene::Find(SceneType type) {
 
 void Scene::DrawBackground(Bitmap& dst) {
 	dst.Fill(Main_Data::game_system->GetBackgroundColor());
+	if (Main_Data::game_dynrpg) {
+		Main_Data::game_dynrpg->OnSystemBackgroundDrawn(type, dst);
+	}
 }
 
 bool Scene::CheckSceneExit(AsyncOp aop) {

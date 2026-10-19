@@ -255,6 +255,7 @@ void Scene_Logo::OnIndexReady(FileRequestResult*) {
 		TREEMAP_NAME,
 		INI_NAME,
 		EASYRPG_INI_NAME, // EasyRPG specific configuration
+		"DynRPG.ini", // DynRPG plugin settings
 		"Font/ExFont", // Custom ExFont
 		"Font/Font", // Custom Gothic Font
 		"Font/Font2", // Custom Mincho Font
