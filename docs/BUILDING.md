@@ -14,7 +14,7 @@ except for [liblcf], in our [buildscripts] repository.
 Building requirements:
 
 - pkg-config (only on Linux)
-- CMake 3.18 or newer
+- CMake 3.22 or newer
 
 Step-by-step instructions:
 
@@ -24,8 +24,75 @@ Step-by-step instructions:
     cmake --build .                       # compile the executable
     sudo cmake --build . --target install # install system-wide
 
-CMake is the only supported way to build Player. On Windows all dependencies
-must be installed with [vcpkg].
+The tarball needs [liblcf] installed. CMake is the only supported way to build
+Player. On Windows all dependencies must be installed with [vcpkg].
+
+
+## From a git clone
+
+[liblcf] is the `lib/liblcf` submodule and is built along with the Player:
+
+    git clone --recurse-submodules https://github.com/oulianov/Player.git
+    cd Player
+    cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+    cmake --build build
+
+- A clone made without `--recurse-submodules` gets the submodule when CMake
+  configures it (`git submodule update --init`).
+- `PLAYER_BUILD_LIBLCF` is on by default in a git clone. Use
+  `-DPLAYER_BUILD_LIBLCF=OFF` to build against an installed liblcf.
+
+To build and run the unit tests:
+
+    cmake --build build --target check
+
+
+## macOS
+
+Install the dependencies with [Homebrew]:
+
+    brew install cmake ninja pkgconf sdl3 pixman libpng fmt freetype harfbuzz \
+      lhasa nlohmann-json speexdsp libsamplerate mpg123 libsndfile libvorbis \
+      opusfile wildmidi fluid-synth libxmp inih icu4c
+
+Then build from a git clone as above. CMake needs two more search paths: ICU,
+which Homebrew installs keg-only, and Homebrew's own prefix, where opusfile
+finds the opus headers:
+
+    cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+      -DCMAKE_PREFIX_PATH="$(brew --prefix icu4c);$(brew --prefix)"
+    cmake --build build
+
+The result is `build/EasyRPG Player.app`. To run a game from the terminal:
+
+    "build/EasyRPG Player.app/Contents/MacOS/EasyRPG Player" --project-path path/to/game --window
+
+
+## Web (Emscripten)
+
+The libraries come from the `emscripten` folder of [buildscripts]. Its
+`0_build_everything.sh` builds them with Emscripten. On Linux and Intel Macs
+it downloads the Emscripten SDK. On Apple Silicon Macs, install it first
+(`brew install emscripten`). The README of buildscripts lists the other tools
+it needs (autoconf, automake, libtool, meson...).
+
+    git clone https://github.com/EasyRPG/buildscripts.git
+    (cd buildscripts/emscripten && ./0_build_everything.sh)
+
+Then, from a git clone of the Player next to buildscripts (`emcmake` comes with
+Emscripten: `source buildscripts/emscripten/emsdk-portable/emsdk_env.sh` when
+buildscripts downloaded it):
+
+    emcmake cmake -B build-web -G Ninja -DCMAKE_BUILD_TYPE=Release \
+      -DPLAYER_ENABLE_TESTS=OFF \
+      -DPLAYER_PREFIX_PATH_APPEND="$PWD/../buildscripts/emscripten" \
+      -DPLAYER_FIND_ROOT_PATH_APPEND=ON \
+      -DPLAYER_JS_BUILD_SHELL=ON
+    cmake --build build-web
+
+The result is `easyrpg-player.html`, `.js` and `.wasm` in `build-web`. A game
+served next to them needs an `index.json` listing its files, like the one the
+web export of the EasyRPG Editor writes.
 
 
 ## libretro core
@@ -89,6 +156,7 @@ Switch, Wii U and 3DS support shipping games, use these parameters:
 
 
 [buildscripts]: https://github.com/EasyRPG/buildscripts
+[Homebrew]: https://brew.sh
 [liblcf]: https://github.com/EasyRPG/liblcf
 [vcpkg]: https://github.com/Microsoft/vcpkg
 [devkitpro.org]: https://devkitpro.org/wiki/Getting_Started

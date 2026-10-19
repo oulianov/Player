@@ -83,7 +83,6 @@ __MACOSX
 /*.build/
 
 # legacy, used for PLAYER_BUILD_LIBLCF
-/lib/liblcf/
 
 # Android
 *.iml
