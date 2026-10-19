@@ -90,9 +90,10 @@
 #include "platform/android/android.h"
 #endif
 
+#include "dynrpg_patches.h"
+
 #ifndef __EMSCRIPTEN__
 // This is not used on Emscripten.
-#include "dynrpg_patches.h"
 #include "exe_reader.h"
 #endif
 
