@@ -17,6 +17,8 @@
 
 // Headers
 #include "game_dynrpg.h"
+
+#include <algorithm>
 #include "bitmap.h"
 #include "drawable.h"
 #include "drawable_mgr.h"
@@ -221,33 +223,71 @@ void Game_DynRpg::InitPlugins() {
 	}
 
 	if (Player::IsPatchDynRpg()) {
-		plugins.emplace_back(new DynRpg::TextPlugin(*this));
-		plugins.emplace_back(new DynRpg::ParamsPlugin(*this));
 
-		auto is = FileFinder::Game() ? FileFinder::Game().OpenFile("DynRPG.ini") : Filesystem_Stream::InputStream();
-		if (is) {
+		auto open_ini = []() {
+			return FileFinder::Game() ? FileFinder::Game().OpenFile("DynRPG.ini") : Filesystem_Stream::InputStream();
+		};
+		if (auto is = open_ini()) {
 			config = std::make_unique<lcf::INIReader>(is);
 			if (config->ParseError()) {
 				Output::Debug("DynRPG: Failed to parse DynRPG.ini");
 			}
 		}
+		if (auto is = open_ini()) {
+			std::string line;
+			while (Utils::ReadLine(is, line)) {
+				const auto start = line.find_first_not_of(" \t");
+				const auto end = line.find(']');
+				if (start != std::string::npos && line[start] == '[' && end != std::string::npos && end > start) {
+					config_sections.push_back(Utils::LowerCase(line.substr(start + 1, end - start - 1)));
+				}
+			}
+		}
 
-		// Plugins hooking the engine: like in RPG_RT, they work when their DLL is there
-		if (HasPluginDll(DynRpg::FasterAtbPlugin::dll_name)) {
-			plugins.emplace_back(new DynRpg::FasterAtbPlugin(*this));
+		// The plugins that run. RPG_RT runs the DLLs of DynPlugins, the Player needs none:
+		// the ones EasyRPG.ini declares ([DynRPG] Plugins=game_clock, ATBWaitOnly...), else
+		// the ones the game has, by their DLL or their section in DynRPG.ini. The plugins only
+		// working on their comments (DynText, DynParams, msg_commands) always run then.
+		std::vector<std::string> declared;
+		if (Player::game_config.dynrpg_plugins_declared) {
+			for (auto name: Utils::Tokenize(Player::game_config.dynrpg_plugins.Get(), [](char32_t c) { return c == ',' || c == ' ' || c == '\t'; })) {
+				name = Utils::LowerCase(name);
+				if (EndsWith(name, ".dll")) {
+					name.resize(name.size() - 4);
+				}
+				if (!name.empty()) {
+					declared.push_back(name);
+				}
+			}
 		}
-		if (HasPluginDll(DynRpg::GameClockPlugin::dll_name)) {
-			plugins.emplace_back(new DynRpg::GameClockPlugin(*this));
+		std::vector<std::string> running;
+		auto add = [&](std::string_view dll, std::string_view section, auto&& create) {
+			const bool runs = Player::game_config.dynrpg_plugins_declared
+				? std::find(declared.begin(), declared.end(), Utils::LowerCase(dll)) != declared.end()
+				: section.empty() || HasPluginDll(dll) || HasConfigSection(section);
+			if (runs) {
+				plugins.emplace_back(create());
+				running.push_back(ToString(dll));
+			}
+		};
+		add("DynTextPlugin", "", [this]() { return new DynRpg::TextPlugin(*this); });
+		add("DynParams", "", [this]() { return new DynRpg::ParamsPlugin(*this); });
+		add(DynRpg::MsgCommandsPlugin::dll_name, "", [this]() { return new DynRpg::MsgCommandsPlugin(*this); });
+		add(DynRpg::FasterAtbPlugin::dll_name, DynRpg::FasterAtbPlugin::section, [this]() { return new DynRpg::FasterAtbPlugin(*this); });
+		add(DynRpg::GameClockPlugin::dll_name, DynRpg::GameClockPlugin::section, [this]() { return new DynRpg::GameClockPlugin(*this); });
+		add(DynRpg::AtbWaitOnlyPlugin::dll_name, DynRpg::AtbWaitOnlyPlugin::section, [this]() { return new DynRpg::AtbWaitOnlyPlugin(*this); });
+		add(DynRpg::ExpCurvesPlugin::dll_name, DynRpg::ExpCurvesPlugin::section, [this]() { return new DynRpg::ExpCurvesPlugin(*this); });
+
+		for (const auto& name: declared) {
+			if (std::none_of(running.begin(), running.end(), [&](const auto& dll) { return Utils::LowerCase(dll) == name; })) {
+				Output::Warning("DynRPG: EasyRPG.ini declares the plugin {}, which the Player doesn't emulate", name);
+			}
 		}
-		if (HasPluginDll(DynRpg::AtbWaitOnlyPlugin::dll_name)) {
-			plugins.emplace_back(new DynRpg::AtbWaitOnlyPlugin(*this));
+		std::string names;
+		for (const auto& name: running) {
+			names += (names.empty() ? "" : ", ") + name;
 		}
-		if (HasPluginDll(DynRpg::ExpCurvesPlugin::dll_name)) {
-			plugins.emplace_back(new DynRpg::ExpCurvesPlugin(*this));
-		}
-		if (HasPluginDll(DynRpg::MsgCommandsPlugin::dll_name)) {
-			plugins.emplace_back(new DynRpg::MsgCommandsPlugin(*this));
-		}
+		Output::Debug("DynRPG: Plugins{}: {}", Player::game_config.dynrpg_plugins_declared ? " (EasyRPG.ini)" : "", names.empty() ? "none" : names);
 
 		if (Main_Data::game_variables) {
 			Main_Data::game_variables->SetWriteHook([](int id, int value) {
@@ -257,6 +297,11 @@ void Game_DynRpg::InitPlugins() {
 	}
 
 	plugins_loaded = true;
+}
+
+bool Game_DynRpg::HasConfigSection(std::string_view section) const {
+	const auto lower = Utils::LowerCase(section);
+	return std::find(config_sections.begin(), config_sections.end(), lower) != config_sections.end();
 }
 
 bool Game_DynRpg::HasPluginDll(std::string_view name) {
@@ -281,18 +326,10 @@ int Game_DynRpg::GetConfigInt(std::string_view section, std::string_view key) co
 }
 
 void Game_DynRpg::SetVariable(int id, int value) {
-	if (id <= 0) {
-		return;
-	}
-	plugin_writes_variable = true;
-	Main_Data::game_variables->Set(id, value);
-	plugin_writes_variable = false;
+	Main_Data::game_variables->SetUnlimited(id, value);
 }
 
 bool Game_DynRpg::OnSetVariable(int id, int value) {
-	if (plugin_writes_variable) {
-		return true;
-	}
 	for (auto& plugin : plugins) {
 		if (!plugin->OnSetVariable(id, value)) {
 			return false;

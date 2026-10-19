@@ -78,6 +78,13 @@ struct Game_ConfigGame {
 
 	ConfigParam<int> patch_powermode{ "Power Mode 2003", "", "Patch", "PowerMode2003", 0 };
 
+	/**
+	 * With DynRPG, the plugins the game uses, by the names of their DLL (game_clock, ATBWaitOnly...).
+	 * When declared, only these run, else the Player finds them (their DLL or their DynRPG.ini section).
+	 */
+	StringConfigParam dynrpg_plugins{ "DynRPG plugins", "DynRPG plugins of the game, instead of finding them", "DynRPG", "Plugins", std::string() };
+	bool dynrpg_plugins_declared = false;
+
 	// Command line only
 	BoolConfigParam patch_support{ "Support patches", "When OFF all patch support is disabled", "", "", true };
 

@@ -920,14 +920,7 @@ bool Scene_Battle_Rpg2k3::UpdateBattleState() {
 	}
 
 	UpdateScreen();
-	if (RuntimePatches::FixBattlerFlash::IsActive()) {
-		for (auto* actor: Main_Data::game_party->GetActors()) {
-			if (auto_battle || actor->GetAutoBattle()) {
-				// RPG_RT stops their flash before updating it
-				actor->Flash(0, 0, 0, 0, 0);
-			}
-		}
-	}
+	RuntimePatches::FixBattlerFlash::OnUpdateBattlers(auto_battle);
 	// FIXME: RPG_RT updates actors first, and this goes into doing CBA actor battle actions initiated last frame
 	UpdateBattlers();
 

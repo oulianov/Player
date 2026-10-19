@@ -36,6 +36,7 @@ namespace DynRpg {
 	class FasterAtbPlugin : public DynRpgPlugin {
 	public:
 		static constexpr const char* dll_name = "faster_atb_advanced";
+		static constexpr const char* section = dll_name;
 
 		explicit FasterAtbPlugin(Game_DynRpg& instance);
 

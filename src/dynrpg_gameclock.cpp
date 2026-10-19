@@ -104,16 +104,16 @@ namespace {
 }
 
 DynRpg::GameClockPlugin::GameClockPlugin(Game_DynRpg& instance) : DynRpgPlugin(dll_name, instance) {
-	var_session_start = instance.GetConfigInt(dll_name, "SessionStart");
-	var_session_current = instance.GetConfigInt(dll_name, "SessionCurrent");
-	var_session_secs = instance.GetConfigInt(dll_name, "SessionSecs");
-	var_playtime_secs = instance.GetConfigInt(dll_name, "PlaytimeSecs");
-	var_playtime_hh = instance.GetConfigInt(dll_name, "PlaytimeHH");
-	var_playtime_mm = instance.GetConfigInt(dll_name, "PlaytimeMM");
-	var_playtime_ss = instance.GetConfigInt(dll_name, "PlaytimeSS");
-	var_restart_trigger = instance.GetConfigInt(dll_name, "RestartTrigger");
-	var_foreground = instance.GetConfigInt(dll_name, "ForegroundVar");
-	var_background = instance.GetConfigInt(dll_name, "BackgroundVar");
+	var_session_start = instance.GetConfigInt(section, "SessionStart");
+	var_session_current = instance.GetConfigInt(section, "SessionCurrent");
+	var_session_secs = instance.GetConfigInt(section, "SessionSecs");
+	var_playtime_secs = instance.GetConfigInt(section, "PlaytimeSecs");
+	var_playtime_hh = instance.GetConfigInt(section, "PlaytimeHH");
+	var_playtime_mm = instance.GetConfigInt(section, "PlaytimeMM");
+	var_playtime_ss = instance.GetConfigInt(section, "PlaytimeSS");
+	var_restart_trigger = instance.GetConfigInt(section, "RestartTrigger");
+	var_foreground = instance.GetConfigInt(section, "ForegroundVar");
+	var_background = instance.GetConfigInt(section, "BackgroundVar");
 }
 
 void DynRpg::GameClockPlugin::StartSession() {
@@ -181,7 +181,7 @@ void DynRpg::GameClockPlugin::OnFrame(Scene::SceneType scene) {
 
 void DynRpg::GameClockPlugin::DrawClock() {
 	if (!foreground_tried) {
-		foreground = LoadIniImage(instance.GetConfig(dll_name, ImageKey("ForegroundImage", var_foreground)), true, foreground_tried);
+		foreground = LoadIniImage(instance.GetConfig(section, ImageKey("ForegroundImage", var_foreground)), true, foreground_tried);
 	}
 
 	if (!clock) {
@@ -209,7 +209,7 @@ void DynRpg::GameClockPlugin::DrawClock() {
 	auto font = Font::Default();
 	auto system = Cache::SystemOrBlack();
 	Text::Draw(*clock, offset, 184, *font, *system, 0, time);
-	Text::Draw(*clock, 8, 168, *font, *system, 1, instance.GetConfig(dll_name, "TimeTextDisplay"));
+	Text::Draw(*clock, 8, 168, *font, *system, 1, instance.GetConfig(section, "TimeTextDisplay"));
 	Text::Draw(*clock, 26, 184, *font, *system, 1, "   :  :  ");
 }
 
@@ -227,7 +227,7 @@ void DynRpg::GameClockPlugin::OnDrawScene(Scene::SceneType scene, Bitmap& dst) {
 
 void DynRpg::GameClockPlugin::OnSystemBackgroundDrawn(Bitmap& dst, const Rect& rect) {
 	if (!background_tried) {
-		background = LoadIniImage(instance.GetConfig(dll_name, ImageKey("BackgroundImage", var_background)), false, background_tried);
+		background = LoadIniImage(instance.GetConfig(section, ImageKey("BackgroundImage", var_background)), false, background_tried);
 	}
 	if (!background) {
 		return;

@@ -277,6 +277,14 @@ namespace RuntimePatches {
 		} };
 
 		bool IsActive();
+
+		/**
+		 * Every frame of a battle, before the battlers are updated: stops
+		 * the flash of the actors on auto battle.
+		 *
+		 * @param party_auto_battle the party chose the Auto command
+		 */
+		void OnUpdateBattlers(bool party_auto_battle);
 	}
 
 	namespace VirtualKeys {

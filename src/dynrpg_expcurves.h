@@ -40,6 +40,8 @@ namespace DynRpg {
 	class ExpCurvesPlugin : public DynRpgPlugin {
 	public:
 		static constexpr const char* dll_name = "ExpBug-in";
+		/** The section doesn't depend on the name of the DLL */
+		static constexpr const char* section = "Exp_Curves";
 
 		explicit ExpCurvesPlugin(Game_DynRpg& instance);
 

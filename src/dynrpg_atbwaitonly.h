@@ -29,6 +29,8 @@ namespace DynRpg {
 	class AtbWaitOnlyPlugin : public DynRpgPlugin {
 	public:
 		static constexpr const char* dll_name = "ATBWaitOnly";
+		/** It reads no settings: an empty section tells the Player that the game uses it */
+		static constexpr const char* section = dll_name;
 
 		explicit AtbWaitOnlyPlugin(Game_DynRpg& instance) : DynRpgPlugin(dll_name, instance) {}
 

@@ -212,6 +212,7 @@ void Game_ConfigGame::LoadFromStream(Filesystem_Stream::InputStream& is) {
 	}
 
 	new_game.FromIni(ini);
+	dynrpg_plugins_declared |= dynrpg_plugins.FromIni(ini);
 	engine_str.FromIni(ini);
 	engine_path.FromIni(ini);
 	fake_resolution.FromIni(ini);

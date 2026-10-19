@@ -26,8 +26,8 @@ namespace {
 }
 
 DynRpg::FasterAtbPlugin::FasterAtbPlugin(Game_DynRpg& instance) : DynRpgPlugin(dll_name, instance) {
-	variable_id = instance.GetConfigInt(dll_name, "BattleSpeedVariable");
-	default_speed = instance.GetConfigInt(dll_name, "DefaultSpeed");
+	variable_id = instance.GetConfigInt(section, "BattleSpeedVariable");
+	default_speed = instance.GetConfigInt(section, "DefaultSpeed");
 	if (!started) {
 		started = true;
 		Game_DynRpg::SetBattleSpeed(default_speed);

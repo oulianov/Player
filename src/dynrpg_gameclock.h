@@ -51,6 +51,7 @@ namespace DynRpg {
 	class GameClockPlugin : public DynRpgPlugin {
 	public:
 		static constexpr const char* dll_name = "game_clock";
+		static constexpr const char* section = dll_name;
 
 		explicit GameClockPlugin(Game_DynRpg& instance);
 

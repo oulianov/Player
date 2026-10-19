@@ -56,6 +56,12 @@ public:
 	 */
 	void SetWriteHook(WriteHook hook);
 
+	/**
+	 * Writes a variable as a DynRPG plugin does (RPG::variables[id] = value):
+	 * without the limits of the engine and without the write hook.
+	 */
+	void SetUnlimited(int variable_id, Var_t value);
+
 	Var_t Get(int variable_id) const;
 	Var_t GetIndirect(int variable_id) const;
 	Var_t GetWithMode(int id, int mode) const;
@@ -192,6 +198,16 @@ inline void Game_Variables::SetLowerLimit(size_t limit) {
 
 inline void Game_Variables::SetWriteHook(WriteHook hook) {
 	write_hook = std::move(hook);
+}
+
+inline void Game_Variables::SetUnlimited(int variable_id, Var_t value) {
+	if (variable_id <= 0) {
+		return;
+	}
+	if (variable_id > static_cast<int>(_variables.size())) {
+		_variables.resize(variable_id, 0);
+	}
+	_variables[variable_id - 1] = value;
 }
 
 inline bool Game_Variables::Write(int index, Var_t value) {

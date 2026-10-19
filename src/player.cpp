@@ -983,6 +983,7 @@ void Player::ResetGameObjects() {
 
 	// before the actors: DynRPG plugins may change their EXP curve
 	Main_Data::game_dynrpg = std::make_unique<Game_DynRpg>();
+	Main_Data::game_dynrpg->LoadPlugins();
 
 	Main_Data::game_strings = std::make_unique<Game_Strings>();
 

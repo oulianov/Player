@@ -417,6 +417,18 @@ bool RuntimePatches::FixBattlerFlash::IsActive() {
 	return Player::game_config.patch_fix_battler_flash.Get() > 0;
 }
 
+void RuntimePatches::FixBattlerFlash::OnUpdateBattlers(bool party_auto_battle) {
+	if (!IsActive()) {
+		return;
+	}
+	for (auto* actor: Main_Data::game_party->GetActors()) {
+		if (party_auto_battle || actor->GetAutoBattle()) {
+			// RPG_RT stops their flash before updating it
+			actor->Flash(0, 0, 0, 0, 0);
+		}
+	}
+}
+
 namespace RuntimePatches::PowerMode2003 {
 	void HandleCommands() {
 		int op = Main_Data::game_variables->Get(PM_VAR_CR0);

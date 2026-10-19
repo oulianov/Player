@@ -141,6 +141,13 @@ class Game_DynRpg {
 public:
 	bool Invoke(std::string_view command, Game_Interpreter* interpreter = nullptr);
 	void Update();
+
+	/**
+	 * Loads the plugins of the game (DynRPG loads them at start-up), when the
+	 * game objects are made: their hooks then see every write of a variable.
+	 * The calls that need the plugins load them too.
+	 */
+	void LoadPlugins() { InitPlugins(); }
 	void Load(int slot);
 	void Save(int slot);
 
@@ -211,7 +218,7 @@ public:
 
 	/**
 	 * Writes a variable as a plugin does (RPG::variables[id] = value):
-	 * without calling OnSetVariable.
+	 * without calling OnSetVariable, without the limits of the engine.
 	 */
 	void SetVariable(int id, int value);
 
@@ -221,10 +228,13 @@ public:
 	/** @return whether DynRPG.ini has the key */
 	bool HasConfig(std::string_view section, std::string_view key) const;
 
+	/** @return whether DynRPG.ini has the section (case-insensitive), even empty */
+	bool HasConfigSection(std::string_view section) const;
+
 	/** @return a key of DynRPG.ini read as a number like atoi does (0 when missing or not a number) */
 	int GetConfigInt(std::string_view section, std::string_view key) const;
 
-	/** @return whether the game has the plugin DynPlugins/<name>.dll */
+	/** @return whether the game has the plugin DynPlugins/<name>.dll (it isn't needed: see HasConfigSection) */
 	static bool HasPluginDll(std::string_view name);
 
 	/** @return the frame running the comment of a plugin call (RPG::EventScriptData) */
@@ -259,7 +269,7 @@ private:
 	void LoadPluginData(int slot);
 
 	std::unique_ptr<lcf::INIReader> config;
-	bool plugin_writes_variable = false;
+	std::vector<std::string> config_sections; // lower case
 	static int battle_speed;
 
 	using dyn_rpg_func = std::unordered_map<std::string, dynfunc>;

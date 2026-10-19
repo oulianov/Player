@@ -19,8 +19,6 @@
 #include "dynrpg_expcurves.h"
 
 namespace {
-	// the section doesn't depend on the name of the DLL
-	constexpr const char* section = "Exp_Curves";
 	constexpr int64_t scale = 1000000;
 
 	// the DLL's arithmetic: 32 bit products by 10^6 and 64 bit sums and products that wrap
