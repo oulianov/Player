@@ -217,6 +217,10 @@ protected:
 	static std::vector<std::string> GetBattleCommandNames(const Game_Actor* actor);
 	/** @return whether the actor's commands end with Row */
 	static bool HasRowCommand();
+	/** @return how many commands the command window shows at once, for an actor with that many */
+	static int GetBattleCommandWindowRows(int commands);
+	/** Fits the command window to the commands of the actor (without Row) */
+	void ResizeBattleCommandWindow();
 	void SetBattleCommandsDisable(Window_Command& window, const Game_Actor* actor);
 
 	std::unique_ptr<Sprite> ally_cursor, enemy_cursor;

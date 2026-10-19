@@ -352,10 +352,10 @@ void Scene_Battle_Rpg2k3::CreateUi() {
 		status_window->SetY(y);
 
 		if (lcf::Data::battlecommands.battle_type == lcf::rpg::BattleCommands::BattleType_gauge) {
-			command_window->SetY(Player::screen_height / 2 - 80 / 2 + 12);
 			item_window->SetY(76);
 			skill_window->SetY(76);
 		}
+		ResizeBattleCommandWindow();
 	}
 
 	ResetWindows(true);
@@ -654,23 +654,18 @@ void Scene_Battle_Rpg2k3::CreateBattleCommandWindow() {
 
 	SetBattleCommandsDisable(*command_window, actor);
 
-	int height = 80;
-
-	command_window->SetHeight(height);
 	switch (lcf::Data::battlecommands.battle_type) {
 		case lcf::rpg::BattleCommands::BattleType_traditional:
 			command_window->SetX(Player::menu_offset_x + target_window->GetWidth() - command_window->GetWidth());
-			command_window->SetY(Player::screen_height - Player::menu_offset_y - height);
 			break;
 		case lcf::rpg::BattleCommands::BattleType_alternative:
 			command_window->SetX(Player::menu_offset_x + MENU_WIDTH);
-			command_window->SetY(Player::screen_height - Player::menu_offset_y - height);
 			break;
 		case lcf::rpg::BattleCommands::BattleType_gauge:
 			command_window->SetX(Player::menu_offset_x);
-			command_window->SetY(Player::screen_height / 2 - height / 2);
 			break;
 	}
+	ResizeBattleCommandWindow();
 	// Above the target window
 	command_window->SetZ(Priority_Window + 20);
 
@@ -685,6 +680,31 @@ void Scene_Battle_Rpg2k3::RefreshCommandWindow(const Game_Actor* actor) {
 	command_window->ReplaceCommands(std::move(commands));
 	SetBattleCommandsDisable(*command_window, actor);
 	command_window->SetIndex(-1);
+	ResizeBattleCommandWindow();
+}
+
+int Scene_Battle_Rpg2k3::GetBattleCommandWindowRows(int commands) {
+	// RPG_RT's window has room for 4 commands. Without the Row command (norow), it fits the
+	// commands of the actor instead of leaving empty lines under them.
+	if (HasRowCommand()) {
+		return 4;
+	}
+	return std::clamp(commands, 1, 4);
+}
+
+void Scene_Battle_Rpg2k3::ResizeBattleCommandWindow() {
+	const bool small = lcf::Data::battlecommands.window_size == lcf::rpg::BattleCommands::WindowSize_small;
+	const int full_height = small ? 68 : 80;
+	const int item_height = small ? 14 : 16;
+	const int height = full_height - (4 - GetBattleCommandWindowRows(command_window->GetRowMax())) * item_height;
+
+	command_window->SetHeight(height);
+	if (lcf::Data::battlecommands.battle_type == lcf::rpg::BattleCommands::BattleType_gauge) {
+		// at the same top as the window of 4 commands
+		command_window->SetY(Player::screen_height / 2 - 80 / 2 + (small ? 12 : 0));
+	} else {
+		command_window->SetY(Player::screen_height - Player::menu_offset_y - height);
+	}
 }
 
 void Scene_Battle_Rpg2k3::SetActiveActor(int idx) {
