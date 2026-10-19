@@ -231,6 +231,54 @@ namespace RuntimePatches {
 		bool OverrideDamageAdjustment(int& dmg, const Game_Battler& target);
 	}
 
+	/**
+	 * Support for RPG_RT patch 'KillSwitch' (KillSwitch - RPG_RT2k3 v1.08.ips).
+	 * The party dying on the map leads to the Game Over only while a switch
+	 * (default: S[999]) is ON: the game handles the death of the party itself.
+	 *
+	 * RPG_RT checks the party every frame on the map, so the Game Over also
+	 * comes when the switch is turned ON while the party is dead.
+	 * Battles are not changed.
+	 */
+	namespace KillSwitch {
+		constexpr std::array<PatchArg, 1> patch_args = { {
+			{ Player::game_config.patch_kill_switch, "-switch", 999 }
+		} };
+
+		/** @return false when the patch prevents the Game Over of a dead party on the map */
+		bool AllowsGameOver();
+
+		/** Every frame on the map. @return whether the dead party leads to the Game Over */
+		bool IsMapGameOver();
+	}
+
+	/**
+	 * Support for RPG_RT patch 'norow' (norow DYNRPG.ips).
+	 * RPG Maker 2003 battles have no Row command (RPG_RT adds it after the
+	 * actor's commands) and the status scene doesn't show "Front" ("Back"
+	 * still is).
+	 */
+	namespace NoRow {
+		constexpr std::array<PatchArg, 1> patch_args = { {
+			{ Player::game_config.patch_no_row, "", 1 }
+		} };
+
+		bool IsActive();
+	}
+
+	/**
+	 * Support for RPG_RT patch 'FixBattlerFlash' (RPG_RT_FixBattlerFlash.ips).
+	 * Actors fighting on auto battle (their own option, or the Auto command
+	 * of the party) don't flash: RPG_RT stops their flash every frame.
+	 */
+	namespace FixBattlerFlash {
+		constexpr std::array<PatchArg, 1> patch_args = { {
+			{ Player::game_config.patch_fix_battler_flash, "", 1 }
+		} };
+
+		bool IsActive();
+	}
+
 	namespace VirtualKeys {
 		constexpr Input::Keys::InputKey VirtualKeyToInputKey(uint32_t key_id);
 

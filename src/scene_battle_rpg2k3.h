@@ -214,6 +214,8 @@ protected:
 	BattleActionReturn ProcessBattleActionFinished(Game_BattleAlgorithm::AlgorithmBase* action);
 
 	std::vector<std::string> GetBattleCommandNames(const Game_Actor* actor);
+	/** @return whether the actor's commands end with Row */
+	static bool HasRowCommand();
 	void SetBattleCommandsDisable(Window_Command& window, const Game_Actor* actor);
 
 	std::unique_ptr<Sprite> ally_cursor, enemy_cursor;

@@ -36,6 +36,8 @@
 #include "audio.h"
 #include "input.h"
 #include "game_dynrpg.h"
+#include "game_runtime_patches.h"
+#include "scene_gameover.h"
 
 using namespace std::chrono_literals;
 
@@ -279,6 +281,10 @@ void Scene_Map::UpdateStage2() {
 }
 
 void Scene_Map::UpdateSceneCalling() {
+	if (RuntimePatches::KillSwitch::IsMapGameOver()) {
+		SetRequestedScene(std::make_shared<Scene_Gameover>());
+	}
+
 	auto call = TakeRequestedScene();
 
 	if (call == nullptr) {

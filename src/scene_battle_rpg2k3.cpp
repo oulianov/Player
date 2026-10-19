@@ -41,6 +41,7 @@
 #include "game_screen.h"
 #include <lcf/reader_util.h>
 #include "scene_gameover.h"
+#include "game_runtime_patches.h"
 #include "utils.h"
 #include "font.h"
 #include "output.h"
@@ -612,6 +613,11 @@ void Scene_Battle_Rpg2k3::CreateBattleStatusWindow() {
 	status_window->SetZ(Priority_Window + 1);
 }
 
+bool Scene_Battle_Rpg2k3::HasRowCommand() {
+	return Feature::HasRow() && lcf::Data::battlecommands.easyrpg_enable_battle_row_command
+		&& !RuntimePatches::NoRow::IsActive();
+}
+
 std::vector<std::string> Scene_Battle_Rpg2k3::GetBattleCommandNames(const Game_Actor* actor) {
 	std::vector<std::string> commands;
 	if (actor) {
@@ -619,7 +625,7 @@ std::vector<std::string> Scene_Battle_Rpg2k3::GetBattleCommandNames(const Game_A
 			commands.push_back(ToString(cmd->name));
 		}
 	}
-	if (Feature::HasRow() && lcf::Data::battlecommands.easyrpg_enable_battle_row_command) {
+	if (HasRowCommand()) {
 		commands.push_back(ToString(lcf::Data::terms.row));
 	}
 
@@ -914,6 +920,14 @@ bool Scene_Battle_Rpg2k3::UpdateBattleState() {
 	}
 
 	UpdateScreen();
+	if (RuntimePatches::FixBattlerFlash::IsActive()) {
+		for (auto* actor: Main_Data::game_party->GetActors()) {
+			if (auto_battle || actor->GetAutoBattle()) {
+				// RPG_RT stops their flash before updating it
+				actor->Flash(0, 0, 0, 0, 0);
+			}
+		}
+	}
 	// FIXME: RPG_RT updates actors first, and this goes into doing CBA actor battle actions initiated last frame
 	UpdateBattlers();
 
@@ -1447,7 +1461,7 @@ Scene_Battle_Rpg2k3::SceneActionReturn Scene_Battle_Rpg2k3::ProcessSceneActionCo
 		if (Input::IsTriggered(Input::DECISION)) {
 			int index = command_window->GetIndex();
 			// Row command always uses the last index
-			if (!Feature::HasRow() || !lcf::Data::battlecommands.easyrpg_enable_battle_row_command || index < command_window->GetRowMax() - 1) {
+			if (!HasRowCommand() || index < command_window->GetRowMax() - 1) {
 				const auto* command = active_actor->GetBattleCommand(index);
 
 				if (command) {

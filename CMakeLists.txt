@@ -121,6 +121,8 @@ add_library(${PROJECT_NAME} OBJECT
 	src/dynrpg_gameclock.h
 	src/dynrpg_msgcommands.cpp
 	src/dynrpg_msgcommands.h
+	src/dynrpg_patches.cpp
+	src/dynrpg_patches.h
 	src/dynrpg_params.cpp
 	src/dynrpg_params.h
 	src/dynrpg_textplugin.cpp

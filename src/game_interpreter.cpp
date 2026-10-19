@@ -583,7 +583,7 @@ void Game_Interpreter::PushInternal(Game_CommonEvent* ev, ExecutionType ex_type)
 bool Game_Interpreter::CheckGameOver() {
 	if (!Game_Battle::IsBattleRunning() && !Main_Data::game_party->IsAnyActive()) {
 		// Empty party is allowed
-		if (Main_Data::game_party->GetBattlerCount() > 0) {
+		if (Main_Data::game_party->GetBattlerCount() > 0 && RuntimePatches::KillSwitch::AllowsGameOver()) {
 			Scene::instance->SetRequestedScene(std::make_shared<Scene_Gameover>());
 			return true;
 		}

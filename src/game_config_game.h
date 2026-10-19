@@ -72,6 +72,10 @@ struct Game_ConfigGame {
 	ConfigParam<int> patch_guardrevamp_normal{ "GuardRevamp", "Changes damage calculation for defense situations (Normal)", "Patch", "GuardRevamp.NormalDefense", 0 };
 	ConfigParam<int> patch_guardrevamp_strong{ "GuardRevamp", "Changes damage calculation for defense situations (Strong)", "Patch", "GuardRevamp.StrongDefense", 0 };
 
+	ConfigParam<int> patch_kill_switch{ "KillSwitch", "The party dying on the map leads to the Game Over only while this switch is ON", "Patch", "KillSwitch", 0 };
+	ConfigParam<int> patch_no_row{ "NoRow", "No Row command in battles, no \"Front\" in the status scene", "Patch", "NoRow", 0 };
+	ConfigParam<int> patch_fix_battler_flash{ "FixBattlerFlash", "Actors fighting on auto battle don't flash", "Patch", "FixBattlerFlash", 0 };
+
 	ConfigParam<int> patch_powermode{ "Power Mode 2003", "", "Patch", "PowerMode2003", 0 };
 
 	// Command line only

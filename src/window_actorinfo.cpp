@@ -24,6 +24,8 @@
 #include "bitmap.h"
 #include "font.h"
 #include "feature.h"
+#include "dynrpg_patches.h"
+#include "game_runtime_patches.h"
 
 Window_ActorInfo::Window_ActorInfo(int ix, int iy, int iwidth, int iheight, const Game_Actor& actor) :
 	Window_Base(ix, iy, iwidth, iheight),
@@ -41,32 +43,49 @@ void Window_ActorInfo::Refresh() {
 }
 
 void Window_ActorInfo::DrawInfo() {
+	using DynRpg::Patches::StatusText;
+
+	// draws a text where RPG_RT does, with the changes of DynRPG patches
+	auto draw = [this](StatusText which, int x, int y, int color, std::string_view text, Text::Alignment align = Text::AlignLeft) {
+		const auto patched = DynRpg::Patches::GetStatusText(which);
+		if (patched.shown) {
+			contents->TextDraw(x + patched.dx, y + patched.dy, color < 0 ? patched.color : color, text, align);
+		}
+	};
+	// the color RPG_RT draws a text with (patches may change it)
+	constexpr int patched_color = -1;
+
 	if (Feature::HasRow()) {
 		// Draw Row formation.
-		std::string battle_row = actor.GetBattleRow() == Game_Actor::RowType::RowType_back ? lcf::rpg::Terms::TermOrDefault(lcf::Data::terms.easyrpg_status_scene_back, "Back") : lcf::rpg::Terms::TermOrDefault(lcf::Data::terms.easyrpg_status_scene_front, "Front");
-		contents->TextDraw(contents->GetWidth(), 2, Font::ColorDefault, battle_row, Text::AlignRight);
+		if (actor.GetBattleRow() == Game_Actor::RowType::RowType_back) {
+			draw(StatusText::RowBack, contents->GetWidth(), 2, patched_color, lcf::rpg::Terms::TermOrDefault(lcf::Data::terms.easyrpg_status_scene_back, "Back"), Text::AlignRight);
+		} else if (!RuntimePatches::NoRow::IsActive()) {
+			draw(StatusText::RowFront, contents->GetWidth(), 2, patched_color, lcf::rpg::Terms::TermOrDefault(lcf::Data::terms.easyrpg_status_scene_front, "Front"), Text::AlignRight);
+		}
 	}
 
 	// Draw Face
 	DrawActorFace(actor, 0, 0);
 
 	// Draw Name
-	contents->TextDraw(0, 50, 1, lcf::rpg::Terms::TermOrDefault(lcf::Data::terms.easyrpg_status_scene_name, "Name"));
-	DrawActorName(actor, 36, 66);
+	draw(StatusText::NameLabel, 0, 50, patched_color, lcf::rpg::Terms::TermOrDefault(lcf::Data::terms.easyrpg_status_scene_name, "Name"));
+	draw(StatusText::Name, 36, 66, patched_color, actor.GetName());
 
 	// Draw Profession
-	contents->TextDraw(0, 82, 1, lcf::rpg::Terms::TermOrDefault(lcf::Data::terms.easyrpg_status_scene_class, "Class"));
-	DrawActorClass(actor, 36, 98);
+	draw(StatusText::ClassLabel, 0, 82, patched_color, lcf::rpg::Terms::TermOrDefault(lcf::Data::terms.easyrpg_status_scene_class, "Class"));
+	draw(StatusText::Class, 36, 98, patched_color, actor.GetClassName());
 
 	// Draw Rank
-	contents->TextDraw(0, 114, 1, lcf::rpg::Terms::TermOrDefault(lcf::Data::terms.easyrpg_status_scene_title, "Title"));
-	DrawActorTitle(actor, 36, 130);
+	draw(StatusText::TitleLabel, 0, 114, patched_color, lcf::rpg::Terms::TermOrDefault(lcf::Data::terms.easyrpg_status_scene_title, "Title"));
+	draw(StatusText::Title, 36, 130, patched_color, actor.GetTitle());
 
 	// Draw Status
-	contents->TextDraw(0, 146, 1, lcf::rpg::Terms::TermOrDefault(lcf::Data::terms.easyrpg_status_scene_condition, "State"));
-	DrawActorState(actor, 36, 162);
+	draw(StatusText::ConditionLabel, 0, 146, patched_color, lcf::rpg::Terms::TermOrDefault(lcf::Data::terms.easyrpg_status_scene_condition, "State"));
+	// Unit has Normal state if no state is set
+	const lcf::rpg::State* state = actor.GetSignificantState();
+	draw(StatusText::Condition, 36, 162, state ? state->color : Font::ColorDefault, state ? ToString(state->name) : ToString(lcf::Data::terms.normal_status));
 
 	//Draw Level
-	contents->TextDraw(0, 178, 1, lcf::Data::terms.level);
-	contents->TextDraw(78, 178, Font::ColorDefault, std::to_string(actor.GetLevel()), Text::AlignRight);
+	draw(StatusText::LevelLabel, 0, 178, patched_color, lcf::Data::terms.level);
+	draw(StatusText::Level, 78, 178, patched_color, std::to_string(actor.GetLevel()), Text::AlignRight);
 }

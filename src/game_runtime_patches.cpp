@@ -24,6 +24,7 @@
 #include "game_switches.h"
 #include "game_variables.h"
 #include "game_actor.h"
+#include "game_battle.h"
 #include "game_battler.h"
 #include "game_enemy.h"
 #include "main_data.h"
@@ -120,6 +121,9 @@ void RuntimePatches::LockPatchesAsDiabled() {
 	LockPatchArguments(MonSca::patch_args);
 	LockPatchArguments(EXPlus::patch_args);
 	LockPatchArguments(GuardRevamp::patch_args);
+	LockPatchArguments(KillSwitch::patch_args);
+	LockPatchArguments(NoRow::patch_args);
+	LockPatchArguments(FixBattlerFlash::patch_args);
 }
 
 bool RuntimePatches::ParseFromCommandLine(CmdlineParser& cp) {
@@ -136,6 +140,17 @@ bool RuntimePatches::ParseFromCommandLine(CmdlineParser& cp) {
 	if (cp.ParseNext(arg, 1, { "--patch-guardrevamp", "--no-patch-guardrevamp" })) {
 		return ParsePatchArguments(cp, arg, GuardRevamp::patch_args);
 	}
+	if (cp.ParseNext(arg, 1, { "--patch-kill-switch", "--no-patch-kill-switch" })) {
+		return ParsePatchArguments(cp, arg, KillSwitch::patch_args);
+	}
+	if (cp.ParseNext(arg, 0, { "--patch-no-row", "--no-patch-no-row" })) {
+		Player::game_config.patch_no_row.Set(arg.ArgIsOn() ? 1 : 0);
+		return true;
+	}
+	if (cp.ParseNext(arg, 0, { "--patch-fix-battler-flash", "--no-patch-fix-battler-flash" })) {
+		Player::game_config.patch_fix_battler_flash.Set(arg.ArgIsOn() ? 1 : 0);
+		return true;
+	}
 	return false;
 }
 
@@ -145,6 +160,9 @@ bool RuntimePatches::ParseFromIni(lcf::INIReader& ini) {
 	patch_override |= ParsePatchFromIni(ini, MonSca::patch_args);
 	patch_override |= ParsePatchFromIni(ini, EXPlus::patch_args);
 	patch_override |= ParsePatchFromIni(ini, GuardRevamp::patch_args);
+	patch_override |= ParsePatchFromIni(ini, KillSwitch::patch_args);
+	patch_override |= ParsePatchFromIni(ini, NoRow::patch_args);
+	patch_override |= ParsePatchFromIni(ini, FixBattlerFlash::patch_args);
 	return patch_override;
 }
 
@@ -153,6 +171,9 @@ void RuntimePatches::DetermineActivePatches(std::vector<std::string>& patches) {
 	PrintPatch(patches, MonSca::patch_args);
 	PrintPatch(patches, EXPlus::patch_args);
 	PrintPatch(patches, GuardRevamp::patch_args);
+	PrintPatch(patches, KillSwitch::patch_args);
+	PrintPatch(patches, NoRow::patch_args);
+	PrintPatch(patches, FixBattlerFlash::patch_args);
 }
 
 void RuntimePatches::OnUpdate() {
@@ -372,6 +393,28 @@ bool RuntimePatches::GuardRevamp::OverrideDamageAdjustment(int& dmg, const Game_
 		return true;
 	}
 	return false;
+}
+
+bool RuntimePatches::KillSwitch::AllowsGameOver() {
+	const int switch_id = Player::game_config.patch_kill_switch.Get();
+	return switch_id <= 0 || Main_Data::game_switches->Get(switch_id);
+}
+
+bool RuntimePatches::KillSwitch::IsMapGameOver() {
+	// RPG_RT checks the party every frame on the map, the Player after the
+	// commands that kill: only the patched check needs it
+	if (Player::game_config.patch_kill_switch.Get() <= 0 || !AllowsGameOver() || Game_Battle::IsBattleRunning()) {
+		return false;
+	}
+	return Main_Data::game_party->GetBattlerCount() > 0 && !Main_Data::game_party->IsAnyActive();
+}
+
+bool RuntimePatches::NoRow::IsActive() {
+	return Player::game_config.patch_no_row.Get() > 0;
+}
+
+bool RuntimePatches::FixBattlerFlash::IsActive() {
+	return Player::game_config.patch_fix_battler_flash.Get() > 0;
 }
 
 namespace RuntimePatches::PowerMode2003 {

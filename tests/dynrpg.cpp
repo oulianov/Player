@@ -2,6 +2,8 @@
 #include "doctest.h"
 #include "dynrpg_expcurves.h"
 #include "dynrpg_msgcommands.h"
+#include "dynrpg_patches.h"
+#include <sstream>
 #include "game_dynrpg.h"
 #include "game_variables.h"
 #include "test_mock_actor.h"
@@ -277,6 +279,106 @@ TEST_CASE("msg_commands codes") {
 	CHECK(process(R"(\M[0] x)") == "M[0]  x");
 	CHECK(process(R"(\M[1] and \M[20]!)") == "Slime and M[20]!");
 	CHECK(process(R"(\R[3] \R[36].)") == "Victory R[36].");
+}
+
+namespace {
+	Filesystem_Stream::InputStream MemoryStream(const std::string& data, std::string name) {
+		return Filesystem_Stream::InputStream(new std::stringbuf(data), std::move(name));
+	}
+}
+
+TEST_CASE("DynRPG IPS patches") {
+	const MockActor m; // disable log
+
+	// KillSwitch's "mov edx, 999" (file offset 0xA37EE: CODE), 5 nops of norow (RLE), then EOF
+	std::string ips = "PATCH";
+	ips += std::string("\x0A\x37\xEE\x00\x0C", 5) + std::string("\x89\xC7\xBA\xE7\x03\x00\x00\xE8\x2A\x6F\xFE\xFF", 12);
+	ips += std::string("\x09\xED\x12\x00\x00\x00\x05\x90", 8);
+	ips += "EOF";
+	DynRpg::PatchedCode code;
+	auto is = MemoryStream(ips, "test.ips");
+	CHECK(code.ApplyIps(is));
+	CHECK(code.GetI32(0x4A43F1) == 999);
+	CHECK(code.Matches(0x4A43EE, { 0x89, 0xC7, 0xBA, -1, -1, -1, -1, 0xE8, 0x2A, 0x6F, 0xFE, 0xFF }));
+	CHECK(!code.Matches(0x4A43EE, { 0x89, 0xC8 }));
+	CHECK(code.GetU8(0x49F912) == 0x90);
+	CHECK(code.GetU8(0x49F916) == 0x90);
+	CHECK(!code.GetU8(0x49F917));
+	CHECK(!code.GetI32(0x4A43F9)); // only 3 of its bytes are patched
+
+	// the header (offset < 0x400) and the DATA section map too, past it the patch stops
+	std::string limits = "PATCH";
+	limits += std::string("\x00\x00\x3C\x00\x01" "\x41", 6); // 0x40003C
+	limits += std::string("\x0C\x93\x00\x00\x01" "\x42", 6); // DATA: 0x4CA100
+	limits += std::string("\x0C\xD4\x01\x00\x02" "\x43\x44", 7); // outside of the exe
+	limits += "EOF";
+	auto header = MemoryStream(limits, "limits.ips");
+	CHECK(!code.ApplyIps(header));
+	CHECK(code.GetU8(0x40003C) == 0x41);
+	CHECK(code.GetU8(0x4CA100) == 0x42);
+
+	auto not_ips = MemoryStream("PAT", "short.ips");
+	CHECK(!code.ApplyIps(not_ips));
+}
+
+TEST_CASE("DynRPG quickpatches") {
+	const MockActor m; // disable log
+
+	// Fighting Robots Quest
+	auto ini = MemoryStream(
+		"[QuickPatches]\r\n"
+		"KillSwitch=4A43F1,E7030000\r\n"
+		"DMPVar=446EDE,#3326\r\n"
+		"\r\n"
+		"RemoveClassTitle=49F9AD,00,49FA0C,00\r\n"
+		"StatusClass(y)=49F9E8,#104\r\n"
+		"StatusTitle(y)=49FA31,#88\r\n"
+		"StatusClassColor=49F9E4,%0\r\n"
+		"StatusTitleColor=49FA2D,%0\r\n"
+		";Disabled=49F9AD,01\r\n"
+		"killswitch=4A43F1,00000000\r\n"
+		"[faster_atb_advanced]\r\n"
+		"BattleSpeedVariable=3328\r\n", "DynRPG.ini");
+	const auto patches = DynRpg::ReadQuickPatches(ini);
+	REQUIRE(patches.size() == 7);
+	CHECK(patches[0].first == "KillSwitch");
+	CHECK(patches[0].second == "4A43F1,E7030000");
+	CHECK(patches[6].first == "StatusTitleColor");
+
+	DynRpg::PatchedCode code;
+	for (const auto& patch: patches) {
+		CHECK(code.ApplyQuickPatch(patch.second));
+	}
+	CHECK(code.GetI32(0x4A43F1) == 999);
+	CHECK(code.GetI32(0x446EDE) == 3326);
+	CHECK(code.GetU8(0x49F9AD) == 0);
+	CHECK(code.GetI32(0x49FA31) == 88);
+
+	using DynRpg::Patches::StatusText;
+	auto title = DynRpg::Patches::GetStatusText(StatusText::Title, code);
+	CHECK(title.dx == 0);
+	CHECK(title.dy == 88 - 136);
+	CHECK(title.color == 0);
+	CHECK(title.shown);
+	CHECK(!DynRpg::Patches::GetStatusText(StatusText::ClassLabel, code).shown);
+	CHECK(!DynRpg::Patches::GetStatusText(StatusText::TitleLabel, code).shown);
+	CHECK(DynRpg::Patches::GetStatusText(StatusText::NameLabel, code).shown);
+	CHECK(DynRpg::Patches::GetStatusText(StatusText::Class, code).dy == 0);
+	CHECK(DynRpg::Patches::GetStatusText(StatusText::LevelLabel, code).color == 1);
+
+	// several bytes, spaces, negative values
+	CHECK(code.ApplyQuickPatch("49F925,90 90 90,401000,%-1"));
+	CHECK(!DynRpg::Patches::GetStatusText(StatusText::RowFront, code).shown);
+	CHECK(code.GetU8(0x401000) == 0xFF);
+	CHECK(code.ApplyQuickPatch("401000,#-2"));
+	CHECK(code.GetI32(0x401000) == -2);
+
+	// malformed or outside of limits
+	CHECK(!code.ApplyQuickPatch("49F9AD,0"));
+	CHECK(!code.ApplyQuickPatch("zz,00"));
+	CHECK(!code.ApplyQuickPatch("3FFFFF,00"));
+	CHECK(!code.ApplyQuickPatch("4CEFFD,#1"));
+	CHECK(!code.ApplyQuickPatch("45CE00,90"));
 }
 
 TEST_SUITE_END();

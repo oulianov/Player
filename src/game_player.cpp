@@ -42,6 +42,7 @@
 #include <algorithm>
 #include <cmath>
 #include "scene_gameover.h"
+#include "game_runtime_patches.h"
 
 Game_Player::Game_Player(): Game_PlayerBase(Player)
 {
@@ -665,7 +666,8 @@ bool Game_Player::Move(int dir) {
 				}
 			}
 			if (terrain->damage > 0 && terrain->easyrpg_damage_can_kill) {
-				if (!Main_Data::game_party->IsAnyActive() && Main_Data::game_party->GetBattlerCount() > 0) {
+				if (!Main_Data::game_party->IsAnyActive() && Main_Data::game_party->GetBattlerCount() > 0
+						&& RuntimePatches::KillSwitch::AllowsGameOver()) {
 					Scene::instance->SetRequestedScene(std::make_shared<Scene_Gameover>());
 					return true;
 				}

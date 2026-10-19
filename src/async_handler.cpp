@@ -199,11 +199,15 @@ void AsyncHandler::CreateRequestMapping(const std::string& file) {
 		}
 
 		// Look for Meta.ini files and fetch them. They are required for detecting the translations.
+		// DynRPG: the patches of DynPatches are read at start-up, the plugins are found by their DLL.
 		for (const auto& item: file_mapping) {
-			if (EndsWith(item.first, "meta.ini")) {
+			if (EndsWith(item.first, "meta.ini") || (StartsWith(item.first, "dynpatches/") && EndsWith(item.first, ".ips"))) {
 				auto* request = AsyncHandler::RequestFile(item.second);
 				request->SetImportantFile(true);
 				request->Start();
+			} else if (StartsWith(item.first, "dynplugins/") && EndsWith(item.first, ".dll")) {
+				FileFinder::Game().MakeDirectory("DynPlugins", false);
+				FileFinder::Game().OpenOutputStream(FileFinder::MakePath("DynPlugins", std::get<1>(FileFinder::GetPathAndFilename(item.second))));
 			}
 		}
 	}

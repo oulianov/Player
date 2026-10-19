@@ -92,6 +92,7 @@
 
 #ifndef __EMSCRIPTEN__
 // This is not used on Emscripten.
+#include "dynrpg_patches.h"
 #include "exe_reader.h"
 #endif
 
@@ -884,6 +885,9 @@ void Player::CreateGameObjects() {
 
 	}
 
+	// the patches DynRPG applies from DynPatches and DynRPG.ini
+	DynRpg::Patches::Load();
+
 	game_config.PrintActivePatches();
 
 	ResetGameObjects();
@@ -1527,11 +1531,19 @@ Engine options:
                       Set troop id to variable VAR and skip random battles.
  --patch-dynrpg       Enable support of DynRPG patch by Cherry (very limited).
  --patch-easyrpg      Enable EasyRPG extensions.
+ --patch-fix-battler-flash
+                      Actors fighting on auto battle don't flash
+                      (RPG_RT_FixBattlerFlash).
  --patch-key-patch    Enable Key Patch by Ineluki.
+ --patch-kill-switch [-switch SWITCH]
+                      The party dying on the map leads to the Game Over only
+                      while SWITCH (default: 999) is ON (KillSwitch).
  --patch-maniac [N]   Enable Maniac Patch by BingShan. Values for N:
                        - 1: Enable the patch (default)
                        - 2: Enable the patch but do not adjust variable ranges
                             to 32 bit.
+ --patch-no-row       No Row command in RPG Maker 2003 battles, no "Front" in
+                      the status scene (norow).
  --patch-pic-unlock   Picture movement is not interrupted by messages in any
                       version of the engine.
  --patch-rpg2k3-cmds  Support all RPG Maker 2003 event commands in any version
