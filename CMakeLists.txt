@@ -1029,7 +1029,7 @@ endif()
 cmake_dependent_option(PLAYER_WITH_FFMPEG
 	"Play movies with FFmpeg (libavformat, libavcodec, libswscale, libswresample)" ON
 	"NOT EMSCRIPTEN" OFF)
-player_find_package(NAME FFmpeg
+player_find_package(NAME FFMPEG
 	CONDITION PLAYER_WITH_FFMPEG
 	DEFINITION HAVE_FFMPEG
 	TARGET FFmpeg::FFmpeg)

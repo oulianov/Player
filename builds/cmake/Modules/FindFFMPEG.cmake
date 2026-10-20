@@ -1,5 +1,5 @@
 #.rst:
-# FindFFmpeg
+# FindFFMPEG
 # ----------
 #
 # Find the FFmpeg libraries the movie player uses: libavformat, libavcodec,
@@ -33,7 +33,7 @@ endif()
 set(FFMPEG_VERSION ${PC_FFMPEG_libavcodec_VERSION})
 
 include(FindPackageHandleStandardArgs)
-find_package_handle_standard_args(FFmpeg
+find_package_handle_standard_args(FFMPEG
 	REQUIRED_VARS PC_FFMPEG_LINK_LIBRARIES
 	VERSION_VAR FFMPEG_VERSION)
 

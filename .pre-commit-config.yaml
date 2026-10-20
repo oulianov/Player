@@ -1,0 +1,36 @@
+# The checks of .github/workflows/linter.yml, run on the files a push sends
+# before it leaves (pre-commit's pre-push hook). Set it up once per clone:
+#
+#   uv tool install pre-commit
+#   pre-commit install
+#
+# Run it by hand: pre-commit run --hook-stage pre-push --from-ref origin/dynrpg --to-ref HEAD
+# Skip it for one push: git push --no-verify
+
+default_install_hook_types: [pre-push]
+default_stages: [pre-push]
+
+repos:
+  - repo: local
+    hooks:
+      - id: yamllint
+        name: Lint YAML files
+        language: python
+        additional_dependencies: [yamllint==1.38.0]
+        entry: 'yamllint -d "{extends: relaxed, rules: {line-length: {max: 100}}}"'
+        types: [yaml]
+
+      - id: cmakelint
+        name: Lint CMake files
+        language: python
+        additional_dependencies: [cmakelint==1.4.3]
+        entry: cmakelint --filter=-whitespace/tabs --linelength=120
+        files: (\.cmake|(^|/)CMakeLists\.txt)$
+
+      - id: markdownlint
+        name: Lint Markdown files
+        language: node
+        # the version of DavidAnson/markdownlint-cli2-action@v24
+        additional_dependencies: [markdownlint-cli2@0.23.2]
+        entry: markdownlint-cli2 --config .github/config.markdownlint-cli2.jsonc
+        types: [markdown]
