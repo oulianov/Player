@@ -201,6 +201,7 @@ enum Priority : Drawable::Z_t {
 	Priority_Timer = 140ULL << z_offset,
 	Priority_Frame = 150ULL << z_offset,
 	Priority_Transition = 160ULL << z_offset,
+	Priority_Movie = 165ULL << z_offset, // Over the game, as the video window of RPG_RT
 	Priority_Overlay = 170ULL << z_offset,
 	Priority_Maximum = 255ULL << z_offset // Higher values will overflow
 };

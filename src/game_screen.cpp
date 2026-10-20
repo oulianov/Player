@@ -32,6 +32,7 @@
 #include <lcf/reader_util.h>
 #include "scene.h"
 #include "weather.h"
+#include "movie.h"
 #include "flash.h"
 #include "shake.h"
 #include "rand.h"
@@ -178,6 +179,16 @@ void Game_Screen::PlayMovie(std::string filename,
 	movie_pos_y = pos_y;
 	movie_res_x = res_x;
 	movie_res_y = res_y;
+
+	movie = std::make_unique<Movie>(movie_filename, Rect(pos_x, pos_y, res_x, res_y));
+	if (movie->IsDone()) {
+		// not found or not supported: the game goes on
+		movie.reset();
+	}
+}
+
+bool Game_Screen::IsMoviePlaying() const {
+	return movie != nullptr;
 }
 
 static double interpolate(double d, double x0, double x1)
@@ -326,8 +337,12 @@ void Game_Screen::UpdateScreenEffects() {
 }
 
 void Game_Screen::UpdateMovie() {
-	if (!movie_filename.empty()) {
-		/* update movie */
+	if (movie) {
+		movie->Update();
+		if (movie->IsDone()) {
+			movie.reset();
+			movie_filename.clear();
+		}
 	}
 }
 
@@ -352,7 +367,6 @@ void Game_Screen::UpdateWeather() {
 
 void Game_Screen::Update() {
 	UpdateScreenEffects();
-	UpdateMovie();
 	UpdateWeather();
 	UpdateBattleAnimation();
 }

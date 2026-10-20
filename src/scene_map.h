@@ -85,6 +85,7 @@ private:
 	void StartInn();
 	void UpdateInn();
 	void FinishInn();
+	void UpdateMovie();
 
 	template <typename F> void OnAsyncSuspend(F&& f, AsyncOp aop, bool is_preupdate);
 

@@ -246,6 +246,11 @@ void Scene_Map::vUpdate() {
 		return;
 	}
 
+	if (Main_Data::game_screen->IsMoviePlaying()) {
+		UpdateMovie();
+		return;
+	}
+
 	MapUpdateAsyncContext actx;
 	UpdateStage1(actx);
 }
@@ -458,6 +463,12 @@ void Scene_Map::OnAsyncSuspend(F&& f, AsyncOp aop, bool is_preupdate) {
 		return;
 	}
 
+	if (aop.GetType() == AsyncOp::ePlayMovie) {
+		// The rest of this update waits for the end of the movie (UpdateMovie)
+		map_async_continuation = std::forward<F>(f);
+		return;
+	}
+
 	if (aop.GetType() == AsyncOp::eQuickTeleport) {
 		map_async_continuation = std::forward<F>(f);
 
@@ -503,6 +514,15 @@ void Scene_Map::FinishInn() {
 	activate_inn = false;
 	inn_started = false;
 	AsyncNext(std::move(map_async_continuation));
+}
+
+void Scene_Map::UpdateMovie() {
+	// Nothing else moves while a movie plays, as in RPG_RT
+	Main_Data::game_screen->UpdateMovie();
+	if (!Main_Data::game_screen->IsMoviePlaying() && map_async_continuation) {
+		AsyncNext(std::move(map_async_continuation));
+		map_async_continuation = {};
+	}
 }
 
 void Scene_Map::UpdateInn() {

@@ -31,6 +31,7 @@
 #include <player.h>
 
 class Game_Battler;
+class Movie;
 class Screen;
 class Weather;
 
@@ -57,6 +58,12 @@ public:
 	void PlayMovie(std::string filename,
 		int pos_x, int pos_y, int res_x, int res_y);
 	void Update();
+
+	/** @return whether a movie of PlayMovie plays (or loads): the game waits for its end */
+	bool IsMoviePlaying() const;
+
+	/** Advances the movie, alone: the rest of the game stops meanwhile (Scene_Map) */
+	void UpdateMovie();
 
 	/**
 	 * Returns the current screen tone.
@@ -180,6 +187,7 @@ public:
 private:
 	std::unique_ptr<BattleAnimationMap> animation;
 	std::unique_ptr<Weather> weather;
+	std::unique_ptr<Movie> movie;
 
 	lcf::rpg::SaveScreen data;
 	int flash_sat;		// RPGMaker bug: this isn't saved
@@ -200,7 +208,6 @@ protected:
 	void UpdateFog();
 	void UpdateSandstorm();
 	void UpdateScreenEffects();
-	void UpdateMovie();
 	void UpdateWeather();
 	void UpdateFog(int dx, int dy);
 	void OnWeatherChanged();

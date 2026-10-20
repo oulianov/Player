@@ -46,7 +46,8 @@ class AsyncOp {
 			eYield,
 			eYieldRepeat,
 			eCloneMapEvent,
-			eDestroyMapEvent
+			eDestroyMapEvent,
+			ePlayMovie
 		};
 
 		AsyncOp() = default;
@@ -59,6 +60,9 @@ class AsyncOp {
 
 		/** @return a CallInn async operation */
 		static AsyncOp MakeCallInn();
+
+		/** @return a PlayMovie async operation: the game waits until the movie ends */
+		static AsyncOp MakePlayMovie();
 
 		/** @return a QuickTeleport async operation */
 		static AsyncOp MakeQuickTeleport(int map_id, int x, int y);
@@ -279,6 +283,10 @@ inline AsyncOp AsyncOp::MakeEraseScreen(int transition_type) {
 
 inline AsyncOp AsyncOp::MakeCallInn() {
 	return AsyncOp(eCallInn);
+}
+
+inline AsyncOp AsyncOp::MakePlayMovie() {
+	return AsyncOp(ePlayMovie);
 }
 
 inline AsyncOp AsyncOp::MakeQuickTeleport(int map_id, int x, int y) {

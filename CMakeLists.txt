@@ -66,6 +66,8 @@ add_library(${PROJECT_NAME} OBJECT
 	src/audio_secache.h
 	src/autobattle.cpp
 	src/autobattle.h
+	src/avi_reader.cpp
+	src/avi_reader.h
 	src/background.cpp
 	src/background.h
 	src/baseui.cpp
@@ -286,6 +288,14 @@ add_library(${PROJECT_NAME} OBJECT
 	src/meta.h
 	src/midisequencer.cpp
 	src/midisequencer.h
+	src/movie.cpp
+	src/movie.h
+	src/movie_decoder.cpp
+	src/movie_decoder.h
+	src/movie_decoder_browser.cpp
+	src/movie_decoder_browser.h
+	src/movie_decoder_ffmpeg.cpp
+	src/movie_decoder_ffmpeg.h
 	src/opacity.h
 	src/options.h
 	src/output.cpp
@@ -1013,6 +1023,16 @@ else()
 		TARGET nlohmann_json::nlohmann_json
 		ONLY_CONFIG)
 endif()
+
+# Play Movie: FFmpeg plays the formats the built-in reader (uncompressed AVI) does not.
+# The web build uses the browser instead.
+cmake_dependent_option(PLAYER_WITH_FFMPEG
+	"Play movies with FFmpeg (libavformat, libavcodec, libswscale, libswresample)" ON
+	"NOT EMSCRIPTEN" OFF)
+player_find_package(NAME FFmpeg
+	CONDITION PLAYER_WITH_FFMPEG
+	DEFINITION HAVE_FFMPEG
+	TARGET FFmpeg::FFmpeg)
 
 # Configure Audio backends
 if(PLAYER_HAS_AUDIO)
@@ -1753,6 +1773,14 @@ if(TARGET nlohmann_json::nlohmann_json)
 	message(STATUS "JSON support: nlohmann_json")
 else()
 	message(STATUS "JSON support: No")
+endif()
+
+if(TARGET FFmpeg::FFmpeg)
+	message(STATUS "Movie playback: FFmpeg and built-in (uncompressed AVI)")
+elseif(EMSCRIPTEN)
+	message(STATUS "Movie playback: browser and built-in (uncompressed AVI)")
+else()
+	message(STATUS "Movie playback: built-in (uncompressed AVI)")
 endif()
 
 message(STATUS "")

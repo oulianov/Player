@@ -54,10 +54,6 @@
 #endif
 
 namespace {
-#ifdef SUPPORT_MOVIES
-	auto MOVIE_TYPES = { ".avi", ".mpg" };
-#endif
-
 	std::shared_ptr<Filesystem> root_fs;
 	FilesystemView game_fs;
 	FilesystemView save_fs;
@@ -552,6 +548,11 @@ Filesystem_Stream::InputStream FileFinder::OpenMusic(std::string_view name) {
 Filesystem_Stream::InputStream FileFinder::OpenSound(std::string_view name) {
 	DirectoryTree::Args args = { MakePath("Sound", name), SOUND_TYPES, 1, false };
 	return open_generic("Sound", name, args);
+}
+
+Filesystem_Stream::InputStream FileFinder::OpenMovie(std::string_view name) {
+	DirectoryTree::Args args = { MakePath("Movie", name), MOVIE_TYPES, 1, false };
+	return open_generic("Movie", name, args);
 }
 
 Filesystem_Stream::InputStream FileFinder::OpenFont(std::string_view name) {

@@ -761,9 +761,11 @@ bool Game_Interpreter_Map::CommandPlayMovie(lcf::rpg::EventCommand const& com) {
 	int res_x = com.parameters[3];
 	int res_y = com.parameters[4];
 
-	Output::Warning("Couldn't play movie: {}. Movie playback is not implemented (yet).", filename);
-
 	Main_Data::game_screen->PlayMovie(filename, pos_x, pos_y, res_x, res_y);
+	if (Main_Data::game_screen->IsMoviePlaying()) {
+		// RPG_RT plays the whole movie in this command: the game goes on after its end
+		_async_op = AsyncOp::MakePlayMovie();
+	}
 
 	return true;
 }

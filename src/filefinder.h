@@ -44,6 +44,8 @@ namespace FileFinder {
 			".opus", ".oga", ".ogg", ".wav", ".mid", ".midi", ".mp3", ".wma");
 	constexpr const auto SOUND_TYPES = Utils::MakeSvArray(
 			".opus", ".oga", ".ogg", ".wav", ".mp3", ".wma");
+	constexpr const auto MOVIE_TYPES = Utils::MakeSvArray(
+			".avi", ".mpg", ".mpeg", ".wmv", ".mp4", ".m4v", ".mov", ".webm", ".mkv", ".ogv");
 	constexpr const auto FONTS_TYPES = Utils::MakeSvArray(".fon", ".fnt", ".bdf", ".ttf", ".ttc", ".otf", ".woff2", ".woff");
 	constexpr const auto TEXT_TYPES = Utils::MakeSvArray(".txt", ".csv", ""); // "" = Complete Filename (incl. extension) provided by the user
 
@@ -209,6 +211,16 @@ namespace FileFinder {
 	 * @return read handle on success or invalid handle if not found
 	 */
 	Filesystem_Stream::InputStream OpenSound(std::string_view name);
+
+	/**
+	 * Finds a movie file and opens a file handle to it.
+	 * Searches through the Movie folder of the current RPG Maker game and
+	 * the RTP directories.
+	 *
+	 * @param name the movie path and name.
+	 * @return read handle on success or invalid handle if not found
+	 */
+	Filesystem_Stream::InputStream OpenMovie(std::string_view name);
 
 	/**
 	 * Finds a font file and opens a file handle to it.
