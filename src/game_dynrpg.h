@@ -43,8 +43,12 @@ namespace lcf::rpg {
 class Bitmap;
 class Drawable;
 class DynRpgPlugin;
+class Game_Battler;
 class Game_Interpreter;
 class Rect;
+namespace Game_BattleAlgorithm {
+	class AlgorithmBase;
+}
 
 using dyn_arg_list = const Span<std::string>;
 using dynfunc = bool(*)(dyn_arg_list);
@@ -199,6 +203,22 @@ public:
 	void OnNewGame();
 
 	/**
+	 * DynRPG onDoBattlerAction: a battler starts an action in battle, before
+	 * its message, movement and animation.
+	 *
+	 * @param action the action
+	 */
+	void OnDoBattlerAction(const Game_BattleAlgorithm::AlgorithmBase& action);
+
+	/**
+	 * Whether the normal attacks of a battler may land RPG_RT's critical hits:
+	 * plugins turn them off (with memory patches in RPG_RT).
+	 *
+	 * @param source the attacker
+	 */
+	bool HasStandardCriticalHits(const Game_Battler& source);
+
+	/**
 	 * Draws what plugins draw over the scene, after it was drawn
 	 * (RPG::screen->canvas in DynRPG). See CreateSceneOverlay.
 	 */
@@ -309,6 +329,10 @@ public:
 	virtual bool OnSetVariable(int, int) { return true; }
 	/** See Game_DynRpg::OnNewGame */
 	virtual void OnNewGame() {}
+	/** See Game_DynRpg::OnDoBattlerAction */
+	virtual void OnDoBattlerAction(const Game_BattleAlgorithm::AlgorithmBase&) {}
+	/** See Game_DynRpg::HasStandardCriticalHits, false turns them off */
+	virtual bool HasStandardCriticalHits(const Game_Battler&) const { return true; }
 	/** DynRPG onLoadGame: a game was loaded, after Load() got the plugin's save data */
 	virtual void OnLoadGame() {}
 	/** See Game_DynRpg::OnDrawScene */

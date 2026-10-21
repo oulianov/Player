@@ -38,6 +38,7 @@
 #include "game_battle.h"
 #include "game_interpreter_battle.h"
 #include "game_battlealgorithm.h"
+#include "game_dynrpg.h"
 #include "game_screen.h"
 #include <lcf/reader_util.h>
 #include "scene_gameover.h"
@@ -2143,6 +2144,10 @@ Scene_Battle_Rpg2k3::BattleActionReturn Scene_Battle_Rpg2k3::ProcessBattleAction
 
 Scene_Battle_Rpg2k3::BattleActionReturn Scene_Battle_Rpg2k3::ProcessBattleActionBegin(Game_BattleAlgorithm::AlgorithmBase* action) {
 	auto* source = action->GetSource();
+
+	if (Main_Data::game_dynrpg) {
+		Main_Data::game_dynrpg->OnDoBattlerAction(*action);
+	}
 
 	// Emulate an RPG_RT bug where whenver actors attack, the damage and evasion calculations are performed
 	// as if the enemies are in the front row.

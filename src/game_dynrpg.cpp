@@ -39,6 +39,7 @@
 #include <lcf/rpg/saveeventexecframe.h>
 
 #include "dynrpg_atbwaitonly.h"
+#include "dynrpg_corticustomcrit.h"
 #include "dynrpg_easyrpg.h"
 #include "dynrpg_expcurves.h"
 #include "dynrpg_fasteratb.h"
@@ -277,6 +278,7 @@ void Game_DynRpg::InitPlugins() {
 		add(DynRpg::GameClockPlugin::dll_name, DynRpg::GameClockPlugin::section, [this]() { return new DynRpg::GameClockPlugin(*this); });
 		add(DynRpg::AtbWaitOnlyPlugin::dll_name, DynRpg::AtbWaitOnlyPlugin::section, [this]() { return new DynRpg::AtbWaitOnlyPlugin(*this); });
 		add(DynRpg::ExpCurvesPlugin::dll_name, DynRpg::ExpCurvesPlugin::section, [this]() { return new DynRpg::ExpCurvesPlugin(*this); });
+		add(DynRpg::CortiCustomCritPlugin::dll_name, DynRpg::CortiCustomCritPlugin::section, [this]() { return new DynRpg::CortiCustomCritPlugin(*this); });
 
 		for (const auto& name: declared) {
 			if (std::none_of(running.begin(), running.end(), [&](const auto& dll) { return Utils::LowerCase(dll) == name; })) {
@@ -356,6 +358,24 @@ void Game_DynRpg::OnNewGame() {
 	for (auto& plugin : plugins) {
 		plugin->OnNewGame();
 	}
+}
+
+void Game_DynRpg::OnDoBattlerAction(const Game_BattleAlgorithm::AlgorithmBase& action) {
+	if (!Player::IsPatchDynRpg()) {
+		return;
+	}
+	InitPlugins();
+	for (auto& plugin : plugins) {
+		plugin->OnDoBattlerAction(action);
+	}
+}
+
+bool Game_DynRpg::HasStandardCriticalHits(const Game_Battler& source) {
+	if (!Player::IsPatchDynRpg()) {
+		return true;
+	}
+	InitPlugins();
+	return std::all_of(plugins.begin(), plugins.end(), [&](auto& plugin) { return plugin->HasStandardCriticalHits(source); });
 }
 
 void Game_DynRpg::OnDrawScene(Scene::SceneType scene, Bitmap& dst) {

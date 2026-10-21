@@ -29,6 +29,7 @@
 #include "game_party_base.h"
 #include "game_switches.h"
 #include "game_system.h"
+#include "game_dynrpg.h"
 #include "main_data.h"
 #include "game_message_terms.h"
 #include "player.h"
@@ -703,6 +704,10 @@ bool Game_BattleAlgorithm::Normal::vExecute() {
 
 	auto to_hit = Algo::CalcNormalAttackToHit(source, target, weapon, Game_Battle::GetBattleCondition(), true);
 	auto crit_chance = Algo::CalcCriticalHitChance(source, target, weapon, -1);
+	if (Main_Data::game_dynrpg && !Main_Data::game_dynrpg->HasStandardCriticalHits(source)) {
+		// a DynRPG plugin has critical hits of its own (CortiCustomCrit)
+		crit_chance = 0;
+	}
 
 	// Damage calculation
 	if (!Rand::PercentChance(to_hit)) {
