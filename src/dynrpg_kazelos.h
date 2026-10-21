@@ -22,25 +22,30 @@
 
 namespace DynRpg {
 	/**
-	 * KazeLoS.dll by Kazesui: line of sight. Sets a switch to whether a
-	 * viewer sees a target: in its field of view, in range, no wall between.
+	 * Kaze Line of Sight 1.01 by Kazesui (KazeLoS.dll): sets a switch to
+	 * whether a source sees a target: in its sight field, no wall between.
 	 *
-	 *   @hero_see_event Switch, Event, FOV, Range
-	 *   @hero_see_point Switch, X, Y, FOV, Range
-	 *   @this_see_hero Switch, FOV, Range
-	 *   @this_see_event Switch, Event, FOV, Range
-	 *   @this_see_point Switch, X, Y, FOV, Range
-	 *   @event_see_hero Switch, Event, FOV, Range
-	 *   @event_see_event Switch, Viewer, Target, FOV, Range
-	 *   @event_see_point Switch, Event, X, Y, FOV, Range
-	 *   @point_see_point Switch, X, Y, ViewerX, ViewerY, FOV, Range, Direction
+	 *   @hero_see_event Switch, Event, Width, Radius
+	 *   @hero_see_point Switch, X, Y, Width, Radius
+	 *   @this_see_hero Switch, Width, Radius
+	 *   @this_see_event Switch, Event, Width, Radius
+	 *   @this_see_point Switch, X, Y, Width, Radius
+	 *   @event_see_hero Switch, Source, Width, Radius
+	 *   @event_see_event Switch, Source, Target, Width, Radius
+	 *   @event_see_point Switch, Source, X, Y, Width, Radius
+	 *   @point_see_point Switch, X, Y, SourceX, SourceY, Width, Radius, Direction
 	 *
-	 * FOV: the angle of the field of view in degrees, around the direction
-	 * the viewer faces (point_see_point: Direction in degrees, 0 is right and
-	 * 90 down). Range in pixels. The points are screen pixels, the characters
-	 * are at the center of their tile, where they are while moving.
-	 * The line from the viewer is followed every 8 pixels up to the target:
-	 * a tile where the map allows no move (whatever the events) blocks it.
+	 * Width: the angle of the sight field in degrees, half on each side of
+	 * the direction the source faces (point_see_point: Direction in degrees,
+	 * 0 is right and 90 down). Radius in pixels. The points are screen
+	 * pixels, the characters are at the center of their tile, where they are
+	 * while moving. The line from the source is followed every 8 pixels up to
+	 * the target: a tile where the map allows no move at all blocks it,
+	 * partly passable tiles and events don't.
+	 *
+	 * The readme gives point_see_point the source first and says a width of
+	 * 180 sees everything around: the DLL takes the target first and sees
+	 * 90 degrees on each side, like the Player.
 	 *
 	 * The DLL reads the tiles from the map file when the hero changes maps:
 	 * the Player uses the map as it is (changed tiles count) and wraps the
