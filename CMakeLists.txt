@@ -115,6 +115,8 @@ add_library(${PROJECT_NAME} OBJECT
 	src/dynrpg_atbwaitonly.h
 	src/dynrpg_corticustomcrit.cpp
 	src/dynrpg_corticustomcrit.h
+	src/dynrpg_dataaccess.cpp
+	src/dynrpg_dataaccess.h
 	src/dynrpg_easyrpg.cpp
 	src/dynrpg_easyrpg.h
 	src/dynrpg_expcurves.cpp

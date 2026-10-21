@@ -90,6 +90,16 @@ public:
 	void OnPartyChanged(Game_Actor* actor, bool add) override;
 	void OnEventHpChanged(Game_Battler* battler, int hp) override;
 
+	/**
+	 * Shows a text over a battler like its damage
+	 * (RPG::Battler::damagePopup of DynRPG).
+	 *
+	 * @param battler the battler
+	 * @param color font color (system graphic)
+	 * @param text the text, a number for damage
+	 */
+	void ShowBattlerPopup(Game_Battler* battler, int color, std::string_view text);
+
 protected:
 	void Start2();
 	void InitAtbGauge(Game_Battler& battler, int preempt_atb, int ambush_atb);

@@ -40,6 +40,7 @@
 
 #include "dynrpg_atbwaitonly.h"
 #include "dynrpg_corticustomcrit.h"
+#include "dynrpg_dataaccess.h"
 #include "dynrpg_easyrpg.h"
 #include "dynrpg_expcurves.h"
 #include "dynrpg_fasteratb.h"
@@ -282,6 +283,7 @@ void Game_DynRpg::InitPlugins() {
 		add(DynRpg::ExpCurvesPlugin::dll_name, DynRpg::ExpCurvesPlugin::section, [this]() { return new DynRpg::ExpCurvesPlugin(*this); });
 		add(DynRpg::CortiCustomCritPlugin::dll_name, DynRpg::CortiCustomCritPlugin::section, [this]() { return new DynRpg::CortiCustomCritPlugin(*this); });
 		add(DynRpg::PathfinderPlugin::dll_name, "", [this]() { return new DynRpg::PathfinderPlugin(*this); });
+		add(DynRpg::DataAccessPlugin::dll_name, "", [this]() { return new DynRpg::DataAccessPlugin(*this); });
 
 		for (const auto& name: declared) {
 			if (std::none_of(running.begin(), running.end(), [&](const auto& dll) { return Utils::LowerCase(dll) == name; })) {

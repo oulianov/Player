@@ -107,6 +107,7 @@ static lcf::rpg::Enemy makeDummyEnemy() {
 
 void Game_Enemy::Transform(int new_enemy_id) {
 	enemy = lcf::ReaderUtil::GetElement(lcf::Data::enemies, new_enemy_id);
+	sprite_name.clear();
 
 	if (!enemy) {
 		// Some games (e.g. Battle 5 in Embric) have invalid monsters in the battle.

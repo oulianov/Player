@@ -2965,6 +2965,16 @@ void Scene_Battle_Rpg2k3::OnEventHpChanged(Game_Battler* battler, int hp) {
 			hp < 0 ? Scene_Battle_Rpg2k3::FloatTextType::Damage : Scene_Battle_Rpg2k3::FloatTextType::Heal);
 }
 
+void Scene_Battle_Rpg2k3::ShowBattlerPopup(Game_Battler* battler, int color, std::string_view text) {
+	DrawFloatText(
+			battler->GetBattlePosition().x,
+			battler->GetBattlePosition().y,
+			color,
+			text,
+			battler,
+			Scene_Battle_Rpg2k3::FloatTextType::Damage);
+}
+
 void Scene_Battle_Rpg2k3::RecreateSpWindow(Game_Battler* battler) {
 	bool small_window = (lcf::Data::battlecommands.window_size == lcf::rpg::BattleCommands::WindowSize_small);
 	int spwindow_size = 60;

@@ -98,6 +98,14 @@ public:
 	std::string_view GetSpriteName() const override;
 
 	/**
+	 * Shows another graphic of Monster until the enemy is transformed
+	 * (DynRPG plugins load it into the monster's image)
+	 *
+	 * @param name filename in Monster, empty for the one of the database
+	 */
+	void SetSpriteName(std::string name);
+
+	/**
 	 * Gets the maximum HP for the current level.
 	 *
 	 * @return maximum HP.
@@ -285,6 +293,7 @@ protected:
 	int blink_timer = 0;
 	int death_timer = 0;
 	int explode_timer = 0;
+	std::string sprite_name;
 };
 
 inline Game_Battler::BattlerType Game_Enemy::GetType() const {
@@ -384,7 +393,14 @@ inline std::string_view Game_Enemy::GetName() const {
 }
 
 inline std::string_view Game_Enemy::GetSpriteName() const {
+	if (!sprite_name.empty()) {
+		return sprite_name;
+	}
 	return enemy->battler_name;
+}
+
+inline void Game_Enemy::SetSpriteName(std::string name) {
+	sprite_name = std::move(name);
 }
 
 inline bool Game_Enemy::IsInParty() const {
