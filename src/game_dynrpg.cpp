@@ -45,6 +45,7 @@
 #include "dynrpg_expcurves.h"
 #include "dynrpg_fasteratb.h"
 #include "dynrpg_gameclock.h"
+#include "dynrpg_kazelos.h"
 #include "dynrpg_msgcommands.h"
 #include "dynrpg_textplugin.h"
 #include "dynrpg_params.h"
@@ -284,6 +285,7 @@ void Game_DynRpg::InitPlugins() {
 		add(DynRpg::CortiCustomCritPlugin::dll_name, DynRpg::CortiCustomCritPlugin::section, [this]() { return new DynRpg::CortiCustomCritPlugin(*this); });
 		add(DynRpg::PathfinderPlugin::dll_name, "", [this]() { return new DynRpg::PathfinderPlugin(*this); });
 		add(DynRpg::DataAccessPlugin::dll_name, "", [this]() { return new DynRpg::DataAccessPlugin(*this); });
+		add(DynRpg::KazeLosPlugin::dll_name, "", [this]() { return new DynRpg::KazeLosPlugin(*this); });
 
 		for (const auto& name: declared) {
 			if (std::none_of(running.begin(), running.end(), [&](const auto& dll) { return Utils::LowerCase(dll) == name; })) {

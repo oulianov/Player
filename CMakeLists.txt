@@ -125,6 +125,8 @@ add_library(${PROJECT_NAME} OBJECT
 	src/dynrpg_fasteratb.h
 	src/dynrpg_gameclock.cpp
 	src/dynrpg_gameclock.h
+	src/dynrpg_kazelos.cpp
+	src/dynrpg_kazelos.h
 	src/dynrpg_msgcommands.cpp
 	src/dynrpg_msgcommands.h
 	src/dynrpg_patches.cpp
