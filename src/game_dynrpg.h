@@ -261,6 +261,12 @@ public:
 	static lcf::rpg::SaveEventExecFrame& GetFrame(Game_Interpreter& interpreter);
 
 	/**
+	 * @return eventId of the DynRPG callbacks for the frame running a plugin call:
+	 *   the map event, minus the ID of a common event, 0 for a battle event
+	 */
+	static int GetEventId(Game_Interpreter& interpreter);
+
+	/**
 	 * GetExpForLevel of RPG_RT, for plugins replacing the EXP curve.
 	 *
 	 * @param level level to reach

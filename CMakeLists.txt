@@ -129,6 +129,8 @@ add_library(${PROJECT_NAME} OBJECT
 	src/dynrpg_patches.h
 	src/dynrpg_params.cpp
 	src/dynrpg_params.h
+	src/dynrpg_pathfinder.cpp
+	src/dynrpg_pathfinder.h
 	src/dynrpg_textplugin.cpp
 	src/dynrpg_textplugin.h
 	src/enemyai.cpp

@@ -47,7 +47,9 @@
 #include "dynrpg_msgcommands.h"
 #include "dynrpg_textplugin.h"
 #include "dynrpg_params.h"
+#include "dynrpg_pathfinder.h"
 #include "game_interpreter.h"
+#include "game_interpreter_shared.h"
 
 int Game_DynRpg::battle_speed = 100;
 
@@ -279,6 +281,7 @@ void Game_DynRpg::InitPlugins() {
 		add(DynRpg::AtbWaitOnlyPlugin::dll_name, DynRpg::AtbWaitOnlyPlugin::section, [this]() { return new DynRpg::AtbWaitOnlyPlugin(*this); });
 		add(DynRpg::ExpCurvesPlugin::dll_name, DynRpg::ExpCurvesPlugin::section, [this]() { return new DynRpg::ExpCurvesPlugin(*this); });
 		add(DynRpg::CortiCustomCritPlugin::dll_name, DynRpg::CortiCustomCritPlugin::section, [this]() { return new DynRpg::CortiCustomCritPlugin(*this); });
+		add(DynRpg::PathfinderPlugin::dll_name, "", [this]() { return new DynRpg::PathfinderPlugin(*this); });
 
 		for (const auto& name: declared) {
 			if (std::none_of(running.begin(), running.end(), [&](const auto& dll) { return Utils::LowerCase(dll) == name; })) {
@@ -417,6 +420,18 @@ void Game_DynRpg::OnSystemBackgroundDrawn(Scene::SceneType scene, Bitmap& dst) {
 
 lcf::rpg::SaveEventExecFrame& Game_DynRpg::GetFrame(Game_Interpreter& interpreter) {
 	return interpreter.GetFrame();
+}
+
+int Game_DynRpg::GetEventId(Game_Interpreter& interpreter) {
+	const auto& frame = GetFrame(interpreter);
+	if (frame.event_id > 0) {
+		return frame.event_id;
+	}
+	using EventType = Game_Interpreter_Shared::EventType;
+	if ((frame.maniac_event_info >> 4) == static_cast<int>(EventType::CommonEvent)) {
+		return -frame.maniac_event_id;
+	}
+	return 0;
 }
 
 std::optional<int> Game_DynRpg::GetExpForLevel(int level, int base, int inflation, int correction) {
