@@ -342,6 +342,9 @@ namespace Player {
 	/** Hide Title flag, if true title scene will run without image and music. */
 	extern bool hide_title_flag;
 
+	/** Skip Logos flag, if true the startup logos (EasyRPG's and the game's) are not shown. */
+	extern bool skip_logos_flag;
+
 	/** The width of the screen */
 	extern int screen_width;
 

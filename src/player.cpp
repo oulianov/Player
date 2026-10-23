@@ -111,6 +111,7 @@ namespace Player {
 	bool reset_flag = false;
 	bool debug_flag;
 	bool hide_title_flag;
+	bool skip_logos_flag;
 	int load_game_id;
 	int party_x_position;
 	int party_y_position;
@@ -455,6 +456,7 @@ void Player::Exit() {
 Game_Config Player::ParseCommandLine() {
 	debug_flag = false;
 	hide_title_flag = false;
+	skip_logos_flag = false;
 	exit_flag = false;
 	reset_flag = false;
 	load_game_id = -1;
@@ -534,6 +536,10 @@ Game_Config Player::ParseCommandLine() {
 		if (cp.ParseNext(arg, 0, {"hidetitle", "--hide-title"})) {
 			// Legacy RPG_RT argument - hidetitle
 			hide_title_flag = true;
+			continue;
+		}
+		if (cp.ParseNext(arg, 0, "--skip-logos")) {
+			skip_logos_flag = true;
 			continue;
 		}
 		if(!battletest_handled && cp.ParseNext(arg, 4, {"battletest", "--battle-test"})) {
@@ -1564,6 +1570,8 @@ Engine options:
                       store them in PATH. When using the game browser all games
                       will share the same save directory!
  --seed N             Seeds the random number generator with N.
+ --skip-logos         Skip the startup logos (EasyRPG's and the game's) and go
+                      straight to the title scene.
 
 Providing any patch option disables the patch autodetection of the engine.
 
