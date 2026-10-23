@@ -20,9 +20,14 @@
 
 #include "dynrpg_easyrpg.h"
 #include "main_data.h"
+#include "player.h"
 #include "game_variables.h"
 #include "utils.h"
 #include "version.h"
+
+#ifdef __EMSCRIPTEN__
+#  include <emscripten.h>
+#endif
 
 static bool EasyOput(dyn_arg_list args) {
 	auto func = "output";
@@ -67,6 +72,28 @@ bool DynRpg::EasyRpgPlugin::EasyCall(dyn_arg_list args, bool& do_yield, Game_Int
 	return false;
 }
 
+/**
+ * @easyrpg_exit ["value"]: quits like Shutdown on the title screen, handing the value
+ * to whoever runs the Player. On the web, the page receives it with the
+ * `easyrpg-exit` event once the Player has stopped and the saves are written.
+ */
+static bool EasyExit(dyn_arg_list args) {
+	std::string value;
+	if (!args.empty()) {
+		bool okay = false;
+		value = DynRpg::ParseVarArg("easyrpg_exit", args, 0, okay);
+		if (!okay) {
+			return true;
+		}
+	}
+	Output::Debug("easyrpg_exit: {}", value);
+#ifdef __EMSCRIPTEN__
+	EM_ASM({ Module.exitValue = UTF8ToString($0); }, value.c_str());
+#endif
+	Player::exit_flag = true;
+	return true;
+}
+
 static bool EasyAdd(dyn_arg_list args) {
 	auto func = "easyrpg_add";
 	bool okay = false;
@@ -95,6 +122,8 @@ bool DynRpg::EasyRpgPlugin::Invoke(std::string_view func, dyn_arg_list args, boo
 		return EasyOput(args);
 	} else if (func == "easyrpg_add") {
 		return EasyAdd(args);
+	} else if (func == "easyrpg_exit") {
+		return EasyExit(args);
 	}
 	return false;
 }

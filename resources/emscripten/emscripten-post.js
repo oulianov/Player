@@ -72,4 +72,8 @@ Module["onExit"] = function() {
   // replace canvas
   const cvs = document.getElementById('canvas');
   cvs.parentNode.replaceChild(img, cvs);
+
+  // Tells the page the Player has stopped. `value` is the one of @easyrpg_exit,
+  // null when the player quit by other means (Shutdown, closing the game).
+  window.dispatchEvent(new CustomEvent('easyrpg-exit', { detail: { value: Module.exitValue ?? null } }));
 }
